@@ -1,0 +1,30 @@
+---
+- name: Require review before acting on an expired exception
+  ansible.builtin.assert:
+    that:
+      - not compliance_banner_has_exception or compliance_banner_exception_active
+    fail_msg: >-
+      The exception has expired. Renew or remove it through policy review before remediation.
+
+- name: Apply the approved banner text and permissions
+  become: '{{ compliance_banner_become }}'
+  ansible.builtin.template:
+    src: issue.j2
+    dest: '{{ compliance_banner_target_path }}'
+    owner: '{{ compliance_banner_owner }}'
+    group: '{{ compliance_banner_group }}'
+    mode: '{{ compliance_banner_file_mode }}'
+    follow: false
+  register: compliance_banner_write
+
+- name: Read back the actual result after remediation
+  ansible.builtin.include_tasks: inspect.yml
+  when: not ansible_check_mode
+
+- name: Verify the effective policy after remediation
+  ansible.builtin.assert:
+    that:
+      - compliance_banner_observation.effective_text_matches
+      - compliance_banner_observation.permissions_match
+    fail_msg: Banner remediation completed but the effective policy did not verify.
+  when: not ansible_check_mode

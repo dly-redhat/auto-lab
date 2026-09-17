@@ -1,0 +1,12 @@
+---
+- name: Apply approved console banner policy and verify the result
+  hosts: demo_targets
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Enforce banner policy and publish evidence
+      ansible.builtin.include_role:
+        name: compliance_banner
+      vars:
+        compliance_banner_operation: remediate

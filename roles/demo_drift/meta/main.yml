@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: demo_drift
+  author: auto_lab
+  description: Introduce an explicitly authorized console banner deviation on demo targets.
+  license: MIT
+  min_ansible_version: '2.16'
+  platforms:
+    - name: EL
+      versions: ['9']
+dependencies: []

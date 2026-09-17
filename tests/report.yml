@@ -1,0 +1,95 @@
+---
+- name: Verify evidence persists and missing hosts are not presented as passing
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create a disposable report destination
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_report_
+      register: report_test_directory
+
+    - name: Exercise report generation
+      block:
+        - name: Render a report with an approved deviation and a missing host
+          ansible.builtin.include_role:
+            name: policy_report
+          vars:
+            policy_report_host: localhost
+            policy_report_directory: '{{ report_test_directory.path }}'
+            policy_report_run_id: test_run
+            policy_report_expected_hosts: [fixture_exception, fixture_missing]
+            policy_report_results:
+              fixture_exception:
+                operating_system: RedHat
+                profile: linux_demo
+                control: console_login_banner
+                evaluation_date_utc: '2026-09-16'
+                job_id: fixture_job
+                project_revision: fixture_revision
+                operation: audit
+                check_mode: false
+                observed:
+                  baseline_text_matches: false
+                  effective_text_matches: true
+                  permissions_match: true
+                disposition: approved_deviation
+                exception_status: approved
+                exception:
+                  reason: Retain the approved alternate wording.
+                  approval_ref: TEST-001
+                  approved_by: test_reviewer
+                  expires: '2099-12-31'
+
+        - name: Read persisted JSON evidence
+          ansible.builtin.slurp:
+            src: '{{ report_test_directory.path }}/test_run/results.json'
+          register: report_test_json
+
+        - name: Read persisted human-readable evidence
+          ansible.builtin.slurp:
+            src: '{{ report_test_directory.path }}/test_run/report.md'
+          register: report_test_markdown
+
+        - name: Check machine-readable and human-readable evidence
+          ansible.builtin.assert:
+            that:
+              - >-
+                (report_test_json.content | b64decode | from_json)
+                .fixture_exception.disposition == 'approved_deviation'
+              - "'NO EVIDENCE' in (report_test_markdown.content | b64decode)"
+              - "'approved_deviation' in (report_test_markdown.content | b64decode)"
+              - "'TEST-001' in (report_test_markdown.content | b64decode)"
+              - "'not a CIS score' in (report_test_markdown.content | b64decode)"
+
+        - name: Generate a report using the default timestamp identifier
+          ansible.builtin.include_role:
+            name: policy_report
+          vars:
+            policy_report_host: localhost
+            policy_report_directory: '{{ report_test_directory.path }}'
+            policy_report_expected_hosts: [fixture_exception, fixture_missing]
+            policy_report_results: '{{ report_test_json.content | b64decode | from_json }}'
+
+        - name: Read evidence using the resolved timestamp identifier
+          ansible.builtin.slurp:
+            src: >-
+              {{ report_test_directory.path }}/{{ policy_report_resolved_run_id }}/{{ item }}
+          loop: [results.json, report.md]
+          register: report_test_timestamp_files
+
+        - name: Require both files to share the generated run identifier
+          ansible.builtin.assert:
+            that:
+              - policy_report_resolved_run_id is match('^\d{8}T\d{6}Z$')
+              - >-
+                (report_test_timestamp_files.results[0].content | b64decode | from_json)
+                .fixture_exception.disposition == 'approved_deviation'
+              - >-
+                ('Run: ' ~ policy_report_resolved_run_id)
+                in (report_test_timestamp_files.results[1].content | b64decode)
+      always:
+        - name: Remove only the disposable report fixture
+          ansible.builtin.file:
+            path: '{{ report_test_directory.path }}'
+            state: absent

@@ -5,6 +5,47 @@ This repository is a home-lab demonstration of Red Hat Ansible Automation Platfo
 The repository should demonstrate production-minded Ansible development practices while
 remaining small, understandable, and easy to demo.
 
+## Authoritative Repository Instructions
+
+Before planning or changing repository content, read these documents under
+`.codex/agents/` and follow them alongside this file:
+
+- [Architecture](.codex/agents/ARCHITECTURE.md)
+- [Ansible standards](.codex/agents/ANSIBLE_STANDARDS.md)
+- [Security](.codex/agents/SECURITY.md)
+- [Testing](.codex/agents/TESTING.md)
+
+These are repository instructions, not optional background. Explicit user
+instructions take precedence; identify material conflicts rather than silently
+choosing a different architecture.
+
+For work involving M5, its AAP deployment, execution environments, or lab-device
+capacity, explicitly read the project-local
+[server-info skill](.codex/skills/server-info/SKILL.md) and its linked reference.
+This explicit reference provides access even when the client does not discover
+skills at this project path. The skill is a draft pending user review; its dated
+observations are context, not approval to provision or change infrastructure.
+
+## Established Working Agreements
+
+- Development and Navigator validation happen only on a device external to M5.
+  M5 hosts AAP and managed lab targets; do not establish a development checkout
+  or run development validation there. For the Git-backed workflow, the user
+  pushes to GitHub and AAP synchronizes its Project from Git.
+- Only the user pushes to GitHub. Do not push on their behalf.
+- Validate new or changed automation through `ansible-navigator` using an
+  explicitly selected execution environment. Apply the checks in the testing
+  document through that workflow and report anything not actually verified.
+  Host-only checks do not establish EE compatibility.
+- For documentation-only changes, validate the applicable structure and links;
+  do not invent a playbook or managed-host run to claim a syntax/idempotence pass.
+- Prefer Red Hat Certified Collections, then appropriate `ansible.builtin`
+  content, then validated content, and community collections only when those
+  options are insufficient. Treat command/shell as a last resort. Check RHEL
+  System Roles for RHEL subsystem management. Example dependencies in the
+  architecture document do not authorize adding them. Explain any proposed
+  community dependency, alternatives checked, and its exact version.
+
 ## Primary Goals
 1. Demonstrate idempotent automation.
 2. Organize reusable automation as roles.
@@ -22,10 +63,17 @@ Use this general layout:
 .
 ├── README.md
 ├── AGENTS.md
-├── ARCHITECTURE.md
-├── ANSIBLE_STANDARDS.md
-├── SECURITY.md
-├── TESTING.md
+├── .codex/
+│   ├── agents/
+│   │   ├── ARCHITECTURE.md
+│   │   ├── ANSIBLE_STANDARDS.md
+│   │   ├── SECURITY.md
+│   │   └── TESTING.md
+│   └── skills/
+│       └── server-info/
+│           ├── SKILL.md
+│           └── references/
+│               └── m5.md
 ├── ansible.cfg
 ├── requirements.yml
 ├── inventories/

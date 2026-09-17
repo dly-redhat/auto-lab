@@ -1,0 +1,13 @@
+---
+# Synthetic approved wording exception for demonstration, not a customer approval.
+# Permission and ownership requirements still apply.
+compliance_banner_exception:
+  control: console_login_banner
+  host: rhel_exception
+  profile: linux_demo
+  reason: Application team requires its approved legal notice on this console.
+  approved_by: demo_security_reviewer
+  approval_ref: DEMO-EXCEPTION-001
+  expires: '2027-03-01'
+  allowed_text: |
+    Authorized application administrators only. Activity is monitored and recorded.

@@ -1,0 +1,209 @@
+---
+# Execute only inside the supported RHEL 9 EE through Navigator.
+# All target writes stay in a unique disposable directory inside that container.
+- name: Exercise banner policy and exception behavior in an isolated directory
+  hosts: localhost
+  gather_facts: true
+  vars:
+    compliance_banner_baseline_text: "Authorized use only. Activity is monitored.\n"
+    compliance_banner_become: false
+    compliance_banner_owner: '{{ ansible_facts["user_id"] }}'
+    compliance_banner_group: '{{ ansible_facts["user_id"] }}'
+  tasks:
+    - name: Allocate a disposable test directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_banner_
+      register: banner_test_directory
+
+    - name: Exercise the policy contract
+      block:
+        - name: Select the isolated fixture path
+          ansible.builtin.set_fact:
+            compliance_banner_target_path: '{{ banner_test_directory.path }}/issue'
+
+        - name: Assess an absent banner
+          ansible.builtin.include_role:
+            name: compliance_banner
+
+        - name: Verify audit detects drift without creating a file
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.disposition == 'drift'
+              - not compliance_banner_result.observed.exists
+
+        - name: Apply the baseline
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Verify baseline remediation
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_write.changed
+              - compliance_banner_result.disposition == 'meets_baseline'
+
+        - name: Repeat baseline remediation
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Verify idempotence
+          ansible.builtin.assert:
+            that:
+              - not compliance_banner_write.changed
+
+        - name: Introduce real content and permission drift
+          ansible.builtin.copy:
+            dest: '{{ compliance_banner_target_path }}'
+            content: "Unexpected banner.\n"
+            mode: '0600'
+
+        - name: Detect drift
+          ansible.builtin.include_role:
+            name: compliance_banner
+
+        - name: Verify the read-only check observed both deviations
+          ansible.builtin.assert:
+            that:
+              - not compliance_banner_result.observed.effective_text_matches
+              - not compliance_banner_result.observed.permissions_match
+
+        - name: Define a scoped exception fixture
+          ansible.builtin.set_fact:
+            compliance_banner_exception:
+              control: console_login_banner
+              host: localhost
+              profile: linux_demo
+              reason: Test the approved alternate legal wording.
+              approved_by: test_reviewer
+              approval_ref: TEST-001
+              expires: '2099-12-31'
+              allowed_text: "Approved alternate warning. Activity is monitored.\n"
+
+        - name: Apply the approved alternate value
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Verify an exception is not counted as a baseline pass
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.disposition == 'approved_deviation'
+              - not compliance_banner_result.observed.baseline_text_matches
+              - compliance_banner_result.observed.effective_text_matches
+              - compliance_banner_result.observed.permissions_match
+
+        - name: Repeat remediation with the exception
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Verify the exception is idempotent
+          ansible.builtin.assert:
+            that:
+              - not compliance_banner_write.changed
+
+        - name: Introduce drift outside the allowed exception
+          ansible.builtin.copy:
+            dest: '{{ compliance_banner_target_path }}'
+            content: "This is not approved.\n"
+            mode: '0644'
+
+        - name: Assess the unexpected alternate wording
+          ansible.builtin.include_role:
+            name: compliance_banner
+
+        - name: Verify exceptions do not mask other deviations
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.exception_status == 'approved'
+              - compliance_banner_result.disposition == 'drift'
+
+        - name: Expire the exception
+          ansible.builtin.set_fact:
+            compliance_banner_exception: >-
+              {{ compliance_banner_exception | combine({'expires': '2000-01-01'}) }}
+
+        - name: Report the expired exception
+          ansible.builtin.include_role:
+            name: compliance_banner
+
+        - name: Verify expiry is actionable
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.disposition == 'exception_review_required'
+
+        - name: Verify expired exceptions block remediation
+          block:
+            - name: Attempt remediation with expired approval
+              ansible.builtin.include_role:
+                name: compliance_banner
+              vars:
+                compliance_banner_operation: remediate
+          rescue:
+            - name: Record the expected expiration rejection
+              ansible.builtin.set_fact:
+                banner_test_expiry_rejected: >-
+                  {{ 'exception has expired' in (ansible_failed_result.msg | default('')) }}
+
+        - name: Require the expiration guard to have rejected the operation
+          ansible.builtin.assert:
+            that:
+              - banner_test_expiry_rejected | default(false)
+
+        - name: Read the file after the rejected remediation
+          ansible.builtin.slurp:
+            src: '{{ compliance_banner_target_path }}'
+          register: banner_test_rejected_content
+
+        - name: Verify expiry did not cause an unapproved configuration change
+          ansible.builtin.assert:
+            that:
+              - (banner_test_rejected_content.content | b64decode) == "This is not approved.\n"
+
+        - name: Remove required approval metadata
+          ansible.builtin.set_fact:
+            compliance_banner_exception: >-
+              {{ compliance_banner_exception | combine({'approval_ref': ''}) }}
+
+        - name: Verify incomplete approval is rejected
+          block:
+            - name: Attempt an audit with malformed exception metadata
+              ansible.builtin.include_role:
+                name: compliance_banner
+          rescue:
+            - name: Record the expected metadata rejection
+              ansible.builtin.set_fact:
+                banner_test_metadata_rejected: >-
+                  {{ 'Exception metadata' in (ansible_failed_result.msg | default('')) }}
+
+        - name: Require the metadata guard to have rejected the record
+          ansible.builtin.assert:
+            that:
+              - banner_test_metadata_rejected | default(false)
+
+        - name: Remove the exception through the test policy
+          ansible.builtin.set_fact:
+            compliance_banner_exception: {}
+
+        - name: Restore the baseline after exception removal
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Verify the normal policy applies again
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.disposition == 'meets_baseline'
+              - compliance_banner_result.exception_status == 'none'
+      always:
+        - name: Remove only the disposable test directory
+          ansible.builtin.file:
+            path: '{{ banner_test_directory.path }}'
+            state: absent

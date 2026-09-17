@@ -1,0 +1,50 @@
+---
+- name: Resolve the report identifier once for this invocation
+  ansible.builtin.set_fact:
+    policy_report_resolved_run_id: '{{ policy_report_run_id }}'
+
+- name: Validate the report destination and input
+  ansible.builtin.assert:
+    that:
+      - policy_report_results is mapping
+      - policy_report_results | length > 0
+      - policy_report_expected_hosts is sequence
+      - policy_report_expected_hosts is not string
+      - policy_report_expected_hosts | length > 0
+      - policy_report_host in hostvars
+      - policy_report_directory.startswith('/')
+      - policy_report_resolved_run_id | string is match('^[A-Za-z0-9_-]+$')
+    fail_msg: Supply workflow evidence, expected hosts, and an inventory report destination.
+
+- name: Create a private evidence directory on the report host
+  ansible.builtin.file:
+    path: '{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}'
+    state: directory
+    mode: '0700'
+  delegate_to: '{{ policy_report_host }}'
+
+- name: Save machine-readable policy evidence outside the execution environment
+  ansible.builtin.copy:
+    content: |
+      {{ policy_report_results | to_nice_json }}
+    dest: '{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}/results.json'
+    mode: '0600'
+  delegate_to: '{{ policy_report_host }}'
+
+- name: Save the human-readable policy report
+  ansible.builtin.template:
+    src: report.md.j2
+    dest: '{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}/report.md'
+    mode: '0600'
+  delegate_to: '{{ policy_report_host }}'
+
+- name: Display the combined evidence summary in the job output
+  ansible.builtin.debug:
+    msg: '{{ lookup("ansible.builtin.template", "report.md.j2") }}'
+
+- name: Publish the persistent evidence location
+  ansible.builtin.set_stats:
+    data:
+      policy_report_location: >-
+        {{ policy_report_host }}:{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}
+    per_host: false

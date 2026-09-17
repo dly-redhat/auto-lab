@@ -1,0 +1,6 @@
+---
+policy_report_results: '{{ compliance_results | default({}) }}'
+policy_report_expected_hosts: '{{ groups["demo_targets"] | default([]) }}'
+policy_report_host: ''
+policy_report_directory: /var/tmp/auto-lab-reports
+policy_report_run_id: "{{ awx_job_id | default(now(utc=true, fmt='%Y%m%dT%H%M%SZ')) }}"

@@ -1,0 +1,57 @@
+---
+- name: Require the expected guest operating system and virtualization
+  ansible.builtin.assert:
+    that:
+      - target_precheck_distribution in ['RedHat', 'OracleLinux']
+      - ansible_facts['distribution'] == target_precheck_distribution
+      - ansible_facts['distribution_major_version'] == target_precheck_major_version
+      - ansible_facts['virtualization_role'] == 'guest'
+      - ansible_facts['virtualization_type'] == 'kvm'
+      - ansible_facts['selinux']['status'] == 'enabled'
+      - ansible_facts['selinux']['mode'] == 'enforcing'
+    fail_msg: Expected an isolated RHEL/Oracle Linux 9 KVM guest with enforcing SELinux.
+
+- name: Verify Python module execution over the managed-host connection
+  ansible.builtin.ping:
+
+- name: Wait for first-boot initialization to finish
+  ansible.builtin.wait_for:
+    path: /var/lib/cloud/instance/boot-finished
+    state: present
+    timeout: '{{ target_precheck_cloud_init_timeout }}'
+  when: not ansible_check_mode
+
+- name: Read first-boot initialization results
+  become: true
+  ansible.builtin.slurp:
+    src: /run/cloud-init/result.json
+  register: target_precheck_cloud_init_result
+
+- name: Require first-boot initialization without errors
+  ansible.builtin.assert:
+    that:
+      - (target_precheck_cloud_init_result.content | b64decode | from_json).v1.errors | length == 0
+
+- name: Verify privilege escalation with read-only user facts
+  become: true
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - user
+  register: target_precheck_privileged_facts
+
+- name: Require effective root access for later privileged file writes
+  ansible.builtin.assert:
+    that:
+      - target_precheck_privileged_facts.ansible_facts.ansible_user_uid == 0
+
+- name: Report the verified guest identity
+  ansible.builtin.debug:
+    msg:
+      host: '{{ inventory_hostname }}'
+      distribution: '{{ ansible_facts["distribution"] }}'
+      version: '{{ ansible_facts["distribution_version"] }}'
+      virtualization: '{{ ansible_facts["virtualization_type"] }}'
+      selinux: '{{ ansible_facts["selinux"]["mode"] }}'
+      privilege_escalation: verified

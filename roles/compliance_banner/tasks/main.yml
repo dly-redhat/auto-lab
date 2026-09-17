@@ -1,0 +1,17 @@
+---
+- name: Validate policy inputs before reading or changing the target
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Observe the current console banner
+  ansible.builtin.import_tasks: inspect.yml
+
+- name: Retain the before state
+  ansible.builtin.set_fact:
+    compliance_banner_before: '{{ compliance_banner_observation }}'
+
+- name: Apply the effective policy when requested
+  ansible.builtin.import_tasks: remediate.yml
+  when: compliance_banner_operation == 'remediate'
+
+- name: Publish scoped policy evidence
+  ansible.builtin.import_tasks: report.yml

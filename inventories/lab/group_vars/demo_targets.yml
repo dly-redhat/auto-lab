@@ -1,0 +1,5 @@
+---
+compliance_banner_profile: linux_demo
+compliance_banner_baseline_text: |
+  Authorized use only. Activity may be monitored and recorded.
+compliance_banner_target_path: /etc/issue

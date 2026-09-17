@@ -1,0 +1,6 @@
+---
+- name: Consolidate workflow evidence into a persistent report
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: policy_report

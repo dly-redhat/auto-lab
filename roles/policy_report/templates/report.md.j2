@@ -1,0 +1,32 @@
+# Selected Linux policy report
+
+Run: {{ policy_report_resolved_run_id }}
+
+This report covers the console login banner policy only. It is not a CIS score,
+a Tenable assessment, or a claim of complete Level 2 compliance.
+
+{% for host in policy_report_expected_hosts | sort %}
+## {{ host }}
+{% if host not in policy_report_results %}
+
+NO EVIDENCE: this host did not supply a result. Do not count it as passing.
+{% else %}
+{% set result = policy_report_results[host] %}
+
+- OS: {{ result.operating_system }}
+- Profile/control: {{ result.profile }} / {{ result.control }}
+- Evaluation date (UTC): {{ result.evaluation_date_utc }}
+- Job/revision: {{ result.job_id }} / {{ result.project_revision }}
+- Operation: {{ result.operation }}; check mode: {{ result.check_mode }}
+- Baseline text matches: {{ result.observed.baseline_text_matches }}
+- Effective approved text matches: {{ result.observed.effective_text_matches }}
+- Permissions match: {{ result.observed.permissions_match }}
+- Disposition: {{ result.disposition }}
+- Exception status: {{ result.exception_status }}
+{% if result.exception %}
+- Reason: {{ result.exception.reason }}
+- Approval: {{ result.exception.approval_ref }} ({{ result.exception.approved_by }})
+- Expires: {{ result.exception.expires }} (valid through this UTC date)
+{% endif %}
+{% endif %}
+{% endfor %}

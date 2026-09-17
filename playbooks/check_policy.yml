@@ -1,0 +1,11 @@
+---
+- name: Check the assigned console banner policy without changing hosts
+  hosts: demo_targets
+  gather_facts: true
+  serial: 1
+  tasks:
+    - name: Assess banner policy and publish evidence
+      ansible.builtin.include_role:
+        name: compliance_banner
+      vars:
+        compliance_banner_operation: audit

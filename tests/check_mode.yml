@@ -1,0 +1,70 @@
+---
+# Invoke through Navigator with --check. Only disposable fixture setup/cleanup writes.
+- name: Verify a real check-mode run predicts remediation without applying it
+  hosts: localhost
+  gather_facts: true
+  vars:
+    compliance_banner_baseline_text: "Authorized use only. Activity is monitored.\n"
+    compliance_banner_become: false
+    compliance_banner_owner: '{{ ansible_facts["user_id"] }}'
+    compliance_banner_group: '{{ ansible_facts["user_id"] }}'
+  tasks:
+    - name: Require actual playbook check mode
+      ansible.builtin.assert:
+        that:
+          - ansible_check_mode
+
+    - name: Allocate a disposable fixture despite check mode
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_preview_
+      check_mode: false
+      register: banner_preview_directory
+
+    - name: Exercise the check-mode contract
+      block:
+        - name: Select the fixture path
+          ansible.builtin.set_fact:
+            compliance_banner_target_path: '{{ banner_preview_directory.path }}/issue'
+
+        - name: Seed an actual drifted fixture
+          ansible.builtin.copy:
+            dest: '{{ compliance_banner_target_path }}'
+            content: "Unapproved fixture.\n"
+            mode: '0600'
+          check_mode: false
+
+        - name: Preview remediation
+          ansible.builtin.include_role:
+            name: compliance_banner
+          vars:
+            compliance_banner_operation: remediate
+
+        - name: Require observed drift and a predicted change
+          ansible.builtin.assert:
+            that:
+              - compliance_banner_result.check_mode
+              - compliance_banner_result.predicted_change
+              - compliance_banner_result.disposition == 'drift'
+
+        - name: Read the actual file after preview
+          ansible.builtin.slurp:
+            src: '{{ compliance_banner_target_path }}'
+          register: banner_preview_content
+
+        - name: Inspect actual permissions after preview
+          ansible.builtin.stat:
+            path: '{{ compliance_banner_target_path }}'
+          register: banner_preview_metadata
+
+        - name: Require unchanged actual content and permissions
+          ansible.builtin.assert:
+            that:
+              - (banner_preview_content.content | b64decode) == "Unapproved fixture.\n"
+              - banner_preview_metadata.stat.mode == '0600'
+      always:
+        - name: Remove only the disposable preview fixture
+          ansible.builtin.file:
+            path: '{{ banner_preview_directory.path }}'
+            state: absent
+          check_mode: false

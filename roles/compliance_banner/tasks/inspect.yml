@@ -1,0 +1,43 @@
+---
+- name: Inspect banner metadata without following symbolic links
+  ansible.builtin.stat:
+    path: '{{ compliance_banner_target_path }}'
+    follow: false
+    get_checksum: false
+    get_mime: false
+  register: compliance_banner_stat
+
+- name: Reject unsafe paths and unexpectedly large files
+  ansible.builtin.assert:
+    that:
+      - >-
+        not compliance_banner_stat.stat.exists or
+        (compliance_banner_stat.stat.isreg | default(false) and
+         compliance_banner_stat.stat.size | default(0) <= 65536)
+    fail_msg: The banner path must be a regular file of at most 64 KiB, or absent.
+
+- name: Read existing banner text
+  become: >-
+    {{ compliance_banner_become and not (compliance_banner_stat.stat.readable | default(false)) }}
+  ansible.builtin.slurp:
+    src: '{{ compliance_banner_target_path }}'
+  register: compliance_banner_content
+  when: compliance_banner_stat.stat.exists
+
+- name: Compare actual state with baseline and effective policy
+  ansible.builtin.set_fact:
+    compliance_banner_observation:
+      exists: '{{ compliance_banner_stat.stat.exists }}'
+      baseline_text_matches: >-
+        {{ compliance_banner_stat.stat.exists and
+           (compliance_banner_content.content | default('') | b64decode)
+           == compliance_banner_baseline_text }}
+      effective_text_matches: >-
+        {{ compliance_banner_stat.stat.exists and
+           (compliance_banner_content.content | default('') | b64decode)
+           == compliance_banner_effective_text }}
+      permissions_match: >-
+        {{ compliance_banner_stat.stat.exists and
+           compliance_banner_stat.stat.mode == compliance_banner_file_mode[-4:] and
+           compliance_banner_stat.stat.pw_name | default('') == compliance_banner_owner and
+           compliance_banner_stat.stat.gr_name | default('') == compliance_banner_group }}

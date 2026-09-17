@@ -1,0 +1,4 @@
+---
+# This milestone uses ansible.builtin only. No Galaxy downloads are required.
+collections: []
+roles: []

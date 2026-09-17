@@ -1,0 +1,14 @@
+---
+ansible-navigator:
+  mode: stdout
+  execution-environment:
+    enabled: true
+    container-engine: podman
+    image: >-
+      registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9@sha256:563d524b17ece380ed4392adfc3bb98b7e3340d0c9daac3e6f7db28bce026e68
+    pull:
+      policy: never
+    container-options:
+      - --platform=linux/amd64
+  playbook-artifact:
+    enable: false

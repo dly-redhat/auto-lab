@@ -1,0 +1,8 @@
+---
+- name: Verify managed demo targets before policy jobs
+  hosts: demo_targets
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  roles:
+    - role: target_precheck

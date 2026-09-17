@@ -1,0 +1,42 @@
+---
+- name: Build a report that separates baseline findings from exception disposition
+  ansible.builtin.set_fact:
+    compliance_banner_result:
+      host: '{{ inventory_hostname }}'
+      operating_system: '{{ ansible_facts["distribution"] }}'
+      profile: '{{ compliance_banner_profile }}'
+      control: console_login_banner
+      scope: Selected console banner policy only; not a complete CIS assessment.
+      evaluation_date_utc: '{{ compliance_banner_evaluation_date }}'
+      job_id: '{{ awx_job_id | default("external_validation") }}'
+      project_revision: '{{ awx_project_revision | default("unrecorded_local_revision") }}'
+      operation: '{{ compliance_banner_operation }}'
+      check_mode: '{{ ansible_check_mode }}'
+      before: '{{ compliance_banner_before }}'
+      observed: '{{ compliance_banner_observation }}'
+      predicted_change: >-
+        {{ compliance_banner_operation == 'remediate' and
+           compliance_banner_write.changed | default(false) }}
+      exception_status: >-
+        {{ 'approved' if compliance_banner_exception_active else
+           ('expired' if compliance_banner_has_exception else 'none') }}
+      exception: '{{ compliance_banner_exception }}'
+      disposition: >-
+        {{ 'exception_review_required'
+           if compliance_banner_has_exception and not compliance_banner_exception_active else
+           ('drift' if not compliance_banner_observation.effective_text_matches
+                      or not compliance_banner_observation.permissions_match else
+            ('approved_deviation' if compliance_banner_exception_active
+                                    and not compliance_banner_observation.baseline_text_matches
+             else 'meets_baseline')) }}
+
+- name: Display the host policy evidence
+  ansible.builtin.debug:
+    var: compliance_banner_result
+
+- name: Publish this host result as an AAP workflow artifact
+  ansible.builtin.set_stats:
+    data:
+      compliance_results: '{{ {inventory_hostname: compliance_banner_result} }}'
+    per_host: false
+    aggregate: true

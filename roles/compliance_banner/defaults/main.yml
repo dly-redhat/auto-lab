@@ -1,0 +1,10 @@
+---
+compliance_banner_operation: audit
+compliance_banner_profile: linux_demo
+compliance_banner_baseline_text: ''
+compliance_banner_target_path: /etc/issue
+compliance_banner_owner: root
+compliance_banner_group: root
+compliance_banner_file_mode: '0644'
+compliance_banner_become: true
+compliance_banner_exception: {}

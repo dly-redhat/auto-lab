@@ -1,0 +1,7 @@
+---
+- name: Introduce an explicitly authorized deviation for the live demo
+  hosts: demo_targets
+  gather_facts: true
+  serial: 1
+  roles:
+    - role: demo_drift

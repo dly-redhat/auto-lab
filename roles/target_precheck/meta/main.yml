@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: auto_lab
+  description: Verify isolated managed guests before policy demonstrations
+  license: MIT
+  min_ansible_version: '2.16'
+  platforms:
+    - name: EL
+      versions: ['9']
+dependencies: []

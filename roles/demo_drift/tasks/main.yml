@@ -1,0 +1,32 @@
+---
+- name: Require explicit opt-in and a supported demo target
+  ansible.builtin.assert:
+    that:
+      - demo_drift_allowed is boolean
+      - demo_drift_allowed
+      - inventory_hostname in groups['demo_targets']
+      - ansible_facts['distribution'] in ['RedHat', 'OracleLinux']
+      - ansible_facts['distribution_major_version'] == '9'
+      - demo_drift_target_path == '/etc/issue'
+    fail_msg: Drift injection is restricted to explicitly authorized RHEL/Oracle 9 demo targets.
+
+- name: Inspect the demo banner path
+  ansible.builtin.stat:
+    path: '{{ demo_drift_target_path }}'
+    follow: false
+  register: demo_drift_stat
+
+- name: Refuse a nonregular banner path
+  ansible.builtin.assert:
+    that:
+      - not demo_drift_stat.stat.exists or demo_drift_stat.stat.isreg | default(false)
+
+- name: Seed an intentional content and permission deviation
+  become: true
+  ansible.builtin.copy:
+    dest: '{{ demo_drift_target_path }}'
+    content: '{{ demo_drift_text }}'
+    owner: root
+    group: root
+    mode: '0600'
+    follow: false

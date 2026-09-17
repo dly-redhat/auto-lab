@@ -1,0 +1,8 @@
+---
+galaxy_info:
+  role_name: policy_report
+  author: auto_lab
+  description: Save selected-policy evidence on an explicitly chosen report host.
+  license: MIT
+  min_ansible_version: '2.16'
+dependencies: []

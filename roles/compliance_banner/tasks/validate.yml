@@ -1,0 +1,67 @@
+---
+- name: Require supported targets and a complete baseline
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] in ['RedHat', 'OracleLinux']
+      - ansible_facts['distribution_major_version'] == '9'
+      - compliance_banner_operation in ['audit', 'remediate']
+      - compliance_banner_profile == 'linux_demo'
+      - compliance_banner_baseline_text is string
+      - compliance_banner_baseline_text | trim | length > 0
+      - compliance_banner_baseline_text.endswith('\n')
+      - compliance_banner_target_path is string
+      - compliance_banner_target_path.startswith('/')
+      - compliance_banner_file_mode is match('^0[0-7]{3}$')
+      - compliance_banner_exception is mapping
+    fail_msg: >-
+      This demo requires RHEL/Oracle Linux 9, the linux_demo profile,
+      a newline-terminated baseline, and valid file-policy inputs.
+
+- name: Record the policy evaluation date from the execution environment in UTC
+  ansible.builtin.set_fact:
+    compliance_banner_evaluation_date: "{{ now(utc=true, fmt='%Y-%m-%d') }}"
+    compliance_banner_has_exception: '{{ compliance_banner_exception | length > 0 }}'
+
+- name: Require complete exception metadata and exact scope
+  ansible.builtin.assert:
+    that:
+      - >-
+        ['control', 'host', 'profile', 'reason', 'approved_by', 'approval_ref',
+         'expires', 'allowed_text'] | difference(compliance_banner_exception.keys()) | length == 0
+      - compliance_banner_exception.control | default('') == 'console_login_banner'
+      - compliance_banner_exception.host | default('') == inventory_hostname
+      - compliance_banner_exception.profile | default('') == compliance_banner_profile
+      - compliance_banner_exception.reason | default('') is string
+      - compliance_banner_exception.reason | default('') | trim | length > 0
+      - compliance_banner_exception.approved_by | default('') is string
+      - compliance_banner_exception.approved_by | default('') | trim | length > 0
+      - compliance_banner_exception.approval_ref | default('') is string
+      - compliance_banner_exception.approval_ref | default('') | trim | length > 0
+      - compliance_banner_exception.expires | default('') is string
+      - compliance_banner_exception.expires | default('') is match('^\d{4}-\d{2}-\d{2}$')
+      - compliance_banner_exception.allowed_text | default('') is string
+      - compliance_banner_exception.allowed_text | default('') | trim | length > 0
+      - (compliance_banner_exception.allowed_text | default('')).endswith('\n')
+    fail_msg: Exception metadata is incomplete or does not match this host, profile, and control.
+  when: compliance_banner_has_exception
+
+- name: Validate that the expiration is a real calendar date
+  ansible.builtin.assert:
+    that:
+      - >-
+        (compliance_banner_exception.expires | to_datetime('%Y-%m-%d')).strftime('%Y-%m-%d')
+        == compliance_banner_exception.expires
+    fail_msg: Exception expiration must be a real ISO calendar date.
+  when: compliance_banner_has_exception
+
+- name: Resolve the exception lifecycle
+  ansible.builtin.set_fact:
+    compliance_banner_exception_active: >-
+      {{ compliance_banner_has_exception and
+         compliance_banner_exception.expires | default('') >= compliance_banner_evaluation_date }}
+
+- name: Resolve the effective desired text
+  ansible.builtin.set_fact:
+    compliance_banner_effective_text: >-
+      {{ compliance_banner_exception.allowed_text
+         if compliance_banner_exception_active else compliance_banner_baseline_text }}

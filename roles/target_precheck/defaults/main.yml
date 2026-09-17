@@ -1,0 +1,4 @@
+---
+target_precheck_distribution: ''
+target_precheck_major_version: '9'
+target_precheck_cloud_init_timeout: 180
