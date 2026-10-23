@@ -4,7 +4,7 @@ aap_demo_organization: Auto Lab
 aap_demo_project: Auto Lab | Policy Demo
 aap_demo_inventory: Auto Lab | Managed targets
 aap_demo_inventory_source: Auto Lab | Git inventory
-aap_demo_revision: 93605e91180e8eca0b690dc386e7ffc98a36ac43
+aap_demo_revision: 225a3c5b0621a542ce45b31c754cd88421b4ebbe
 aap_demo_repository: https://github.com/dly-redhat/auto-lab.git
 aap_demo_ee_name: Auto Lab | Supported RHEL 9 pinned
 aap_demo_ee_image: >-

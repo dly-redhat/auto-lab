@@ -22,7 +22,7 @@ The external bootstrap is `playbooks/configure_controller.yml`, with environment
 data in `controller/demo.yml` and reusable implementation in `roles/aap_demo/`.
 It creates objects in the isolated **Auto Lab** organization. The Project uses
 the public HTTPS Git repository and pins reviewed commit
-`93605e91180e8eca0b690dc386e7ffc98a36ac43`. Project updates and branch overrides
+`225a3c5b0621a542ce45b31c754cd88421b4ebbe`. Project updates and branch overrides
 at launch are disabled. Advance that revision deliberately after the user pushes
 and the new runtime content passes external validation.
 
@@ -91,10 +91,17 @@ on the report host survive EE teardown. Configure retention before recurring run
 
 The October 23, 2026 Oracle retirement removes `oracle_standard` and its empty
 group from the live demo inventory and reduces the report template's expected
-hosts to the two RHEL guests. The Git source is still pinned to the earlier
-three-host commit until the user pushes this change and the reviewed revision is
-advanced. Do not synchronize that old inventory source: it would reintroduce the
-retired host. Project and inventory updates on launch remain disabled.
+hosts to the two RHEL guests. The reviewed Git revision above contains that
+two-host inventory. Do not revert to the earlier three-host revision: inventory
+synchronization would reintroduce the retired host. Project and inventory updates
+on launch remain disabled.
+
+Project update 65 successfully synchronized this revision on October 23, 2026.
+Inventory update 66 parsed the two-host YAML but failed with
+`Subscription has expired!`. The existing live inventory was verified to contain
+only the two RHEL hosts and the `demo_targets`/`rhel` groups. Renew the AAP
+subscription and retry inventory synchronization before claiming a successful
+import of this revision.
 
 The **Auto Lab Operators** team can execute both workflows and the standalone
 pre-check/check templates. **Auto Lab Approvers** can approve the remediation

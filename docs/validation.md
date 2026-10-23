@@ -269,3 +269,27 @@ Starting that VM and running validation in one session resolved the issue; no
 replacement image was pulled and no development validation ran on M5. No new
 managed-host remediation or idempotence run was needed for this inventory-only
 scope reduction. Earlier remediation results are historical, not a new test pass.
+
+## Git revision advancement — 2026-10-23
+
+The user explicitly authorized pushing the changes, overriding the standing
+user-only push agreement for this work. Commit
+`225a3c5b0621a542ce45b31c754cd88421b4ebbe` was pushed to `origin/main`.
+The user then authorized advancing the live AAP Project and synchronizing its
+inventory. TLS-verified API calls changed Project 7's pin to that commit.
+Project update 65 succeeded, and both `scm_branch` and `scm_revision` matched it.
+`controller/demo.yml` now records the same pin for future configuration runs.
+
+Inventory update 66 parsed the Git YAML at that revision but ended in `error`:
+`job_explanation: Subscription has expired!`, with `license_error: true`.
+No subscription changes or licensing bypasses were attempted. The inventory
+remains exactly `rhel_standard` and `rhel_exception`, with only `demo_targets`
+and `rhel` groups; report template 12 still expects the same two hosts.
+Renew the subscription and retry the inventory update to complete synchronization.
+
+Navigator checks for the changed pin passed on the Mac: YAML lint, Ansible lint
+production profile for the Controller playbook/role (five files, zero findings),
+and Controller playbook syntax in the explicitly selected supported runtime EE.
+The same tooling digest and runtime image ID documented above were used.
+The external Podman validation VM was stopped afterward. This is a Project sync
+pass and configuration validation, not a successful inventory import or policy job.
