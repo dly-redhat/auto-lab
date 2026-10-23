@@ -33,14 +33,16 @@ but neither has `net-snmp` installed or any enabled DNF repository. External
 preparation and validation completed while AAP's subscription was expired.
 Later that day, the user updated the subscription; API checks confirmed an active,
 compliant trial and inventory update 68 succeeded against the existing pinned
-revision. The new exception code remains local and has not been deployed to AAP.
+revision. The exception runtime has since been pushed as
+`d7d2d71bac52ba63304483ca4ba2804c7cd5c508`; Controller activation results are recorded
+in [the validation log](validation.md).
 
 Consequently, an actual audit may correctly show SNMP service drift on the
 standard host and unknown community evidence without credentials. These results
 must not be replaced by the expected-state table above. Live SNMP service repair
 requires approved RHEL package access, two private community credentials, and
-functional testing. Controller execution of this demo additionally requires the
-new code to be pushed and selected as the Project revision.
+functional testing. Controller's exception overlay selects the pushed runtime
+revision and supplies community values through a private credential.
 
 ## External assessment and report
 
@@ -107,14 +109,13 @@ The audit is periodic/point-in-time; it does not prove continuous compliance.
 
 ## Controller activation
 
-Push the reviewed code and select its exact commit; the previous pinned revision
-does not contain these playbooks. Run the external Controller bootstrap with
-`-e @controller/exception-demo.yml -e aap_demo_revision=<reviewed-commit>` plus
+The exception overlay pins the reviewed, pushed runtime commit. Run the external
+Controller bootstrap with `-e @controller/exception-demo.yml` plus
 the existing private authentication/key mounts. Supply
 `aap_demo_snmp_communities` privately with the two approved strings.
 
 The overlay selects the new audit, remediation, and report entry points under
-the existing constrained templates/workflows. It requires an explicit revision
+the existing constrained templates/workflows. It uses an exact revision
 and adds a secret Controller credential only to the audit/remediation templates.
 The operator approval boundary and disabled schedule remain in place. Actual
 credential injection and workflow execution must be tested after activation.

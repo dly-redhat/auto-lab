@@ -1,4 +1,4 @@
 ---
 aap_demo_policy_mode: exceptions
-# Override with the exact reviewed commit containing the exception playbooks.
-aap_demo_revision: ''
+# Validated exception runtime; advance deliberately after testing and pushing.
+aap_demo_revision: d7d2d71bac52ba63304483ca4ba2804c7cd5c508

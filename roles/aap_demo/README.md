@@ -33,8 +33,8 @@ and timeout have no edge to remediation. The daily schedule remains disabled unt
 report retention and ongoing operation are agreed.
 
 For the multi-control exception demo, use `controller/exception-demo.yml` as an
-extra-vars overlay and supply the exact pushed `aap_demo_revision`. The overlay's
-empty revision deliberately fails validation until a reviewed commit is provided.
+extra-vars overlay. It pins the pushed exception runtime revision; override
+`aap_demo_revision` only when deliberately deploying a newer validated commit.
 Supply `aap_demo_snmp_communities` privately with `standard` and `special` values.
 The role adds a secret custom credential and attaches it only to the selected
 exception audit/remediation templates. See [the runbook](../../docs/exception-demo.md).

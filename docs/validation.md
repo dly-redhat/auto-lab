@@ -370,3 +370,39 @@ exception implementation is still local and unpushed; no new Project pin,
 credential, workflow, or managed-host remediation was applied. Package access,
 private SNMP credentials, and functional validation remain outstanding for live
 SNMP repair.
+
+## Exception Controller activation — 2026-10-23
+
+The user explicitly authorized pushing this demo's commits and deploying the
+validated revision. Runtime commit
+`d7d2d71bac52ba63304483ca4ba2804c7cd5c508` was pushed to `origin/main` and selected
+by the external Navigator bootstrap. The exception overlay now records that pin;
+the original banner-only configuration remains separately available.
+
+The bootstrap completed with 23 tasks OK, six changed, and zero failures. API
+verification confirmed the exact Project revision, successful inventory import,
+both RHEL hosts, and `database_servers` alongside `rhel` and `demo_targets`.
+Audit/remediation templates now use the exception playbooks and their private
+SNMP credential; the report, pre-check, and drift templates do not receive it.
+The admin-only drift template selects the guarded loopback SNMP `public` case.
+The schedule remains disabled and the approval workflow edges are preserved.
+
+Read-only audit workflow 73 succeeded: pre-check job 74, assessment job 75,
+report job 76. Credential injection and workflow evidence hand-off were verified
+through all six host/control results, each carrying runtime revision `d7d2d71`.
+The persistent report is `rhel_standard:/var/tmp/auto-lab-reports/76/`.
+The standard host correctly reports SNMP service/configuration drift and a banner
+pass; the exception host reports the group deviation, community not-applicability,
+and banner waiver. This is a successful assessment of current drift, not a claim
+that SNMP has been configured.
+
+External check-mode preview also passed with zero changes on both guests. Lint
+passed with 76 files and zero findings, and all playbook/test syntax checks passed
+in the same explicitly selected EEs recorded above. Generated community values
+are stored in a Controller credential; private staging is outside the repository.
+
+Both guests were still unregistered at the last preflight. The user chose to
+register them interactively. Repository enablement, actual SNMP installation,
+protocol checks, controlled live drift/repair, and live repeat-run idempotence
+remain pending that prerequisite. The new drift action has passed lint and syntax
+checks but has not yet been exercised against a running SNMP service.
