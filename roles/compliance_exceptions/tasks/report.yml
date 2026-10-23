@@ -1,0 +1,95 @@
+---
+- name: Compare observed SNMP service state with baseline and effective policy
+  ansible.builtin.set_fact:
+    compliance_exceptions_service_baseline: >-
+      {{ 'not_evaluated' if not snmp_policy_service_evidence else
+         (snmp_policy_observed.running and snmp_policy_observed.enabled)
+         if snmp_policy_baseline_enabled else
+         (not snmp_policy_observed.running and snmp_policy_observed.disabled) }}
+    compliance_exceptions_service_effective: >-
+      {{ 'not_evaluated' if not snmp_policy_service_evidence else
+         (snmp_policy_observed.running and snmp_policy_observed.enabled)
+         if compliance_exceptions_snmp_enabled else
+         (not snmp_policy_observed.running and snmp_policy_observed.disabled) }}
+
+- name: Build the three control records with approval context and before state
+  ansible.builtin.set_fact:
+    compliance_exceptions_result:
+      host: '{{ inventory_hostname }}'
+      operating_system: '{{ ansible_facts.distribution }}'
+      profile: '{{ compliance_exceptions_profile }}'
+      evaluated_at_utc: '{{ compliance_exceptions_time }}'
+      job_id: '{{ awx_job_id | default("external_validation") }}'
+      project_revision: '{{ awx_project_revision | default("unrecorded_local_revision") }}'
+      operation: '{{ compliance_exceptions_operation }}'
+      check_mode: '{{ ansible_check_mode }}'
+      scope: Three selected demo controls; no CIS benchmark mapping or full compliance claim.
+      controls:
+        snmp_service:
+          disposition: >-
+            {{ compliance_exceptions_resolved.snmp_service |
+               exception_policy_disposition(compliance_exceptions_service_baseline,
+                                            compliance_exceptions_service_effective,
+                                            evidence=snmp_policy_service_evidence) }}
+          baseline_matches: '{{ compliance_exceptions_service_baseline }}'
+          effective_matches: '{{ compliance_exceptions_service_effective }}'
+          resolution: '{{ compliance_exceptions_resolved.snmp_service }}'
+          before: '{{ snmp_policy_before }}'
+          observed: '{{ snmp_policy_observed }}'
+        snmp_community:
+          disposition: >-
+            {{ compliance_exceptions_resolved.snmp_community |
+               exception_policy_disposition(
+                 snmp_policy_observed.baseline_configuration_matches and
+                 snmp_policy_observed.permissions_match,
+                 snmp_policy_observed.effective_configuration_matches and
+                 snmp_policy_observed.permissions_match,
+                 compliance_exceptions_snmp_enabled,
+                 snmp_policy_credentials_available or not compliance_exceptions_snmp_enabled) }}
+          baseline_matches: >-
+            {{ (snmp_policy_observed.baseline_configuration_matches and
+                snmp_policy_observed.permissions_match)
+               if snmp_policy_credentials_available and compliance_exceptions_snmp_enabled
+               else 'not_evaluated' }}
+          effective_matches: >-
+            {{ (snmp_policy_observed.effective_configuration_matches and
+                snmp_policy_observed.permissions_match)
+               if snmp_policy_credentials_available and compliance_exceptions_snmp_enabled
+               else 'not_evaluated' }}
+          resolution: '{{ compliance_exceptions_resolved.snmp_community }}'
+          applicability_reason: >-
+            {{ 'SNMP is required by effective policy' if compliance_exceptions_snmp_enabled
+               else 'Approved policy disables SNMP; community configuration is not applicable' }}
+          evidence_note: >-
+            {{ 'Credential-backed comparison available' if snmp_policy_credentials_available
+               else 'Community credentials were not supplied; no configuration pass is claimed' }}
+          before: '{{ snmp_policy_before }}'
+          observed: '{{ snmp_policy_observed }}'
+        console_login_banner:
+          disposition: >-
+            {{ compliance_exceptions_resolved.console_login_banner |
+               exception_policy_disposition(
+                 compliance_banner_result.observed.baseline_text_matches and
+                 compliance_banner_result.observed.permissions_match,
+                 compliance_banner_result.observed.effective_text_matches and
+                 compliance_banner_result.observed.permissions_match) }}
+          baseline_matches: >-
+            {{ compliance_banner_result.observed.baseline_text_matches and
+               compliance_banner_result.observed.permissions_match }}
+          effective_matches: >-
+            {{ compliance_banner_result.observed.effective_text_matches and
+               compliance_banner_result.observed.permissions_match }}
+          resolution: '{{ compliance_exceptions_resolved.console_login_banner }}'
+          before: '{{ compliance_exceptions_banner_before }}'
+          observed: '{{ compliance_banner_result.observed }}'
+
+- name: Display the selected-control evidence without secret configuration content
+  ansible.builtin.debug:
+    var: compliance_exceptions_result
+
+- name: Publish a single complete host record to the workflow
+  ansible.builtin.set_stats:
+    data:
+      compliance_results: '{{ {inventory_hostname: compliance_exceptions_result} }}'
+    per_host: false
+    aggregate: true

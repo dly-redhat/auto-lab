@@ -1,0 +1,52 @@
+---
+- name: Restrict SNMP drift to the reviewed RHEL demo configuration
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'RedHat'
+      - demo_drift_snmp_path == '/etc/snmp/snmpd.conf'
+      - demo_drift_snmp_service == 'snmpd.service'
+
+- name: Inspect the configured SNMP file without following links
+  become: true
+  ansible.builtin.stat:
+    path: '{{ demo_drift_snmp_path }}'
+    follow: false
+    get_checksum: false
+    get_mime: false
+  register: demo_drift_snmp_stat
+
+- name: Require an existing regular demo configuration
+  ansible.builtin.assert:
+    that:
+      - demo_drift_snmp_stat.stat.isreg | default(false)
+      - demo_drift_snmp_stat.stat.size | default(0) < 65536
+
+- name: Read the configuration privately before seeding drift
+  become: true
+  ansible.builtin.slurp:
+    src: '{{ demo_drift_snmp_path }}'
+  no_log: true
+  register: demo_drift_snmp_content
+
+- name: Require exactly the loopback-only demo layout before introducing public
+  ansible.builtin.assert:
+    that:
+      - demo_drift_snmp_lines | length == 4
+      - demo_drift_snmp_lines[0] == '# Managed by the selected-policy Ansible demonstration.'
+      - demo_drift_snmp_lines[1] == 'agentaddress udp:127.0.0.1:161'
+      - demo_drift_snmp_lines[2] == 'view demo included .1.3.6.1.2.1.1'
+      - demo_drift_snmp_lines[3] is match('^rocommunity [A-Za-z0-9_-]+ 127\.0\.0\.1 -V demo$')
+    fail_msg: Apply the loopback-only approved demo configuration before seeding SNMP drift.
+  no_log: true
+  vars:
+    demo_drift_snmp_lines: '{{ (demo_drift_snmp_content.content | b64decode).splitlines() }}'
+
+- name: Seed only the intentional community deviation without exposing the prior value
+  become: true
+  ansible.builtin.replace:
+    path: '{{ demo_drift_snmp_path }}'
+    regexp: '^rocommunity [A-Za-z0-9_-]+ 127\.0\.0\.1 -V demo$'
+    replace: 'rocommunity public 127.0.0.1 -V demo'
+  no_log: true
+  diff: false
+  notify: Activate intentional loopback SNMP drift

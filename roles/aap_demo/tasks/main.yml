@@ -5,7 +5,18 @@
       - aap_demo_revision is match('^[a-f0-9]{40}$')
       - aap_demo_url.startswith('https://')
       - aap_demo_token | length > 0
+      - aap_demo_policy_mode in ['banner', 'exceptions']
   no_log: true
+
+- name: Validate private SNMP inputs for the exception demo
+  ansible.builtin.assert:
+    that:
+      - aap_demo_snmp_communities is mapping
+      - aap_demo_snmp_communities.standard is match('^[A-Za-z0-9_-]{8,64}$')
+      - aap_demo_snmp_communities.special is match('^[A-Za-z0-9_-]{8,64}$')
+      - aap_demo_snmp_communities.standard != aap_demo_snmp_communities.special
+  no_log: true
+  when: aap_demo_policy_mode == 'exceptions'
 
 - name: Create the isolated platform organization
   ansible.platform.organization:
@@ -121,6 +132,40 @@
       known_hosts: '{{ lookup("ansible.builtin.file", aap_demo_known_hosts_file) }}'
     state: present
 
+- name: Define secret community injection for the exception demo
+  ansible.controller.credential_type:
+    name: '{{ aap_demo_snmp_credential_type }}'
+    kind: cloud
+    inputs:
+      fields:
+        - id: standard
+          label: Baseline SNMP community
+          type: string
+          secret: true
+        - id: special
+          label: Approved alternate SNMP community
+          type: string
+          secret: true
+      required: [standard, special]
+    injectors:
+      extra_vars:
+        snmp_policy_communities:
+          standard: "{{ '{{ standard }}' }}"
+          special: "{{ '{{ special }}' }}"
+    state: present
+  when: aap_demo_policy_mode == 'exceptions'
+
+- name: Store approved SNMP communities in a Controller credential
+  ansible.controller.credential:
+    name: '{{ aap_demo_snmp_credential }}'
+    organization: '{{ aap_demo_organization }}'
+    credential_type: '{{ aap_demo_snmp_credential_type }}'
+    inputs: '{{ aap_demo_snmp_communities }}'
+    update_secrets: false
+    state: present
+  no_log: true
+  when: aap_demo_policy_mode == 'exceptions'
+
 - name: Create constrained job templates
   ansible.controller.job_template:
     name: '{{ item.name }}'
@@ -128,7 +173,10 @@
     project: '{{ aap_demo_project }}'
     inventory: '{{ aap_demo_inventory }}'
     execution_environment: '{{ aap_demo_ee_name }}'
-    credentials: ['{{ aap_demo_machine_credential }}', '{{ aap_demo_trust_credential }}']
+    credentials: >-
+      {{ [aap_demo_machine_credential, aap_demo_trust_credential] +
+         ([aap_demo_snmp_credential] if item.playbook in
+          ['playbooks/check_exceptions.yml', 'playbooks/remediate_exceptions.yml'] else []) }}
     playbook: '{{ item.playbook }}'
     limit: '{{ item.limit }}'
     job_type: run

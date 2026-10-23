@@ -1,0 +1,25 @@
+---
+- name: Restrict banner drift to the reviewed demo file
+  ansible.builtin.assert:
+    that: [demo_drift_target_path == '/etc/issue']
+
+- name: Inspect the demo banner path
+  ansible.builtin.stat:
+    path: '{{ demo_drift_target_path }}'
+    follow: false
+  register: demo_drift_stat
+
+- name: Refuse a nonregular banner path
+  ansible.builtin.assert:
+    that:
+      - not demo_drift_stat.stat.exists or demo_drift_stat.stat.isreg | default(false)
+
+- name: Seed an intentional content and permission deviation
+  become: true
+  ansible.builtin.copy:
+    dest: '{{ demo_drift_target_path }}'
+    content: '{{ demo_drift_text }}'
+    owner: root
+    group: root
+    mode: '0600'
+    follow: false

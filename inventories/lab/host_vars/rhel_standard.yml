@@ -1,0 +1,14 @@
+---
+compliance_exceptions_host:
+  - id: DEMO-EXC-HOST-002
+    control: snmp_community
+    profile: linux_demo
+    host: rhel_standard
+    status: approved
+    kind: alternate
+    reason: Legacy monitoring requires the separately approved community credential.
+    approved_by: demo_security_reviewer
+    ticket: DEMO-CHG-002
+    expires: '2027-03-01'
+    value:
+      community_ref: special

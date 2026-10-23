@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: auto_lab
+  description: Audit and enforce a scoped Net-SNMP service and community configuration
+  license: MIT
+  min_ansible_version: '2.16'
+dependencies: []

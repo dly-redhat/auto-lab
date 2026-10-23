@@ -1,5 +1,10 @@
 # AAP policy remediation demo
 
+The new [group, host, and control exception demo](docs/exception-demo.md) adds
+SNMP service/community policies and an observed banner waiver on the two RHEL
+guests. It has separate entry points; the original banner-only demo remains below.
+See the runbook for package-access and AAP subscription prerequisites.
+
 This repository demonstrates the hand-off after a security team receives a
 Tenable finding: check the current setting, resolve an approved host exception,
 remediate through AAP, verify the result, and retain evidence.

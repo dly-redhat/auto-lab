@@ -1,0 +1,96 @@
+---
+- name: Require an explicit operation and the implemented control catalog
+  ansible.builtin.assert:
+    that:
+      - compliance_exceptions_operation in ['audit', 'remediate']
+      - compliance_exceptions_profile == 'linux_demo'
+      - >-
+        compliance_exceptions_controls | sort ==
+        ['console_login_banner', 'snmp_community', 'snmp_service']
+    fail_msg: This demo implements three named controls, not a complete CIS benchmark.
+
+- name: Resolve every exception before making any configuration changes
+  ansible.builtin.set_fact:
+    compliance_exceptions_time: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+    compliance_exceptions_resolved: '{{ compliance_exceptions_input | exception_policy_resolve }}'
+  vars:
+    compliance_exceptions_input:
+      date: "{{ now(utc=true, fmt='%Y-%m-%d') }}"
+      host: '{{ inventory_hostname }}'
+      groups: '{{ group_names }}'
+      profile: '{{ compliance_exceptions_profile }}'
+      group: '{{ compliance_exceptions_group }}'
+      control: '{{ compliance_exceptions_control }}'
+      host_records: '{{ compliance_exceptions_host }}'
+
+- name: Block enforcement when any selected approval needs review
+  ansible.builtin.assert:
+    that:
+      - >-
+        compliance_exceptions_resolved | dict2items |
+        selectattr('value.review_required') | list | length == 0
+    fail_msg: An exception is expired, revoked, or pending; review it before remediation.
+  when: compliance_exceptions_operation == 'remediate'
+
+- name: Audit or enforce the effective SNMP policy
+  ansible.builtin.include_role:
+    name: snmp_policy
+    public: true
+  vars:
+    snmp_policy_operation: '{{ compliance_exceptions_operation }}'
+    snmp_policy_enabled: >-
+      {{ compliance_exceptions_resolved.snmp_service.value.enabled |
+         default(snmp_policy_baseline_enabled) }}
+    snmp_policy_community_ref: >-
+      {{ compliance_exceptions_resolved.snmp_community.value.community_ref |
+         default(snmp_policy_baseline_community_ref) }}
+    snmp_policy_manage_service: '{{ not compliance_exceptions_resolved.snmp_service.waived }}'
+    snmp_policy_manage_community: '{{ not compliance_exceptions_resolved.snmp_community.waived }}'
+
+- name: Retain resolved SNMP expectations outside the included role
+  ansible.builtin.set_fact:
+    compliance_exceptions_snmp_enabled: >-
+      {{ compliance_exceptions_resolved.snmp_service.value.enabled |
+         default(snmp_policy_baseline_enabled) }}
+
+- name: Adapt approved alternate banner wording to the existing banner role
+  ansible.builtin.set_fact:
+    compliance_exceptions_banner_exception: >-
+      {{ {'control': 'console_login_banner', 'host': inventory_hostname,
+          'profile': compliance_exceptions_profile,
+          'reason': compliance_exceptions_banner_resolution.exception.reason,
+          'approved_by': compliance_exceptions_banner_resolution.exception.approved_by,
+          'approval_ref': compliance_exceptions_banner_resolution.exception.ticket,
+          'expires': compliance_exceptions_banner_resolution.exception.expires,
+          'allowed_text': compliance_exceptions_banner_resolution.value.text}
+         if compliance_exceptions_banner_resolution.active and
+         not compliance_exceptions_banner_resolution.waived else {} }}
+  vars:
+    compliance_exceptions_banner_resolution: >-
+      {{ compliance_exceptions_resolved.console_login_banner }}
+
+- name: Observe the banner even when enforcement is waived
+  ansible.builtin.include_role:
+    name: compliance_banner
+  vars:
+    compliance_banner_operation: audit
+    compliance_banner_exception: '{{ compliance_exceptions_banner_exception }}'
+    compliance_banner_publish: false
+
+- name: Preserve the original banner observation
+  ansible.builtin.set_fact:
+    compliance_exceptions_banner_before: '{{ compliance_banner_result.observed }}'
+
+- name: Enforce the banner only when its control is not waived
+  ansible.builtin.include_role:
+    name: compliance_banner
+  vars:
+    compliance_banner_operation: remediate
+    compliance_banner_exception: '{{ compliance_exceptions_banner_exception }}'
+    compliance_banner_publish: false
+  when:
+    - compliance_exceptions_operation == 'remediate'
+    - not compliance_exceptions_resolved.console_login_banner.waived
+
+- name: Assemble positive per-control evidence
+  ansible.builtin.include_tasks: report.yml

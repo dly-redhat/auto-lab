@@ -7,11 +7,15 @@
   ansible.builtin.assert:
     that:
       - policy_report_results is mapping
-      - policy_report_results | length > 0
+      - policy_report_results | length > 0 or policy_report_format == 'controls'
       - policy_report_expected_hosts is sequence
       - policy_report_expected_hosts is not string
       - policy_report_expected_hosts | length > 0
       - policy_report_host in hostvars
+      - policy_report_format in ['banner', 'controls']
+      - policy_report_expected_controls is sequence
+      - policy_report_expected_controls is not string
+      - policy_report_expected_controls | length > 0
       - policy_report_directory.startswith('/')
       - policy_report_resolved_run_id | string is match('^[A-Za-z0-9_-]+$')
     fail_msg: Supply workflow evidence, expected hosts, and an inventory report destination.
@@ -26,21 +30,29 @@
 - name: Save machine-readable policy evidence outside the execution environment
   ansible.builtin.copy:
     content: |
-      {{ policy_report_results | to_nice_json }}
+      {{ policy_report_document | to_nice_json }}
     dest: '{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}/results.json'
     mode: '0600'
   delegate_to: '{{ policy_report_host }}'
+  vars:
+    policy_report_document: >-
+      {{ {'schema_version': 1, 'run_id': policy_report_resolved_run_id,
+          'expected_hosts': policy_report_expected_hosts,
+          'expected_controls': policy_report_expected_controls, 'results': policy_report_results}
+         if policy_report_format == 'controls' else policy_report_results }}
 
 - name: Save the human-readable policy report
   ansible.builtin.template:
-    src: report.md.j2
+    src: '{{ "controls.md.j2" if policy_report_format == "controls" else "report.md.j2" }}'
     dest: '{{ policy_report_directory }}/{{ policy_report_resolved_run_id }}/report.md'
     mode: '0600'
   delegate_to: '{{ policy_report_host }}'
 
 - name: Display the combined evidence summary in the job output
   ansible.builtin.debug:
-    msg: '{{ lookup("ansible.builtin.template", "report.md.j2") }}'
+    msg: >-
+      {{ lookup('ansible.builtin.template',
+         'controls.md.j2' if policy_report_format == 'controls' else 'report.md.j2') }}
 
 - name: Publish the persistent evidence location
   ansible.builtin.set_stats:

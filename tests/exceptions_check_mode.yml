@@ -1,0 +1,79 @@
+---
+- name: Verify the exception workflow observes real drift without writes in check mode
+  hosts: localhost
+  gather_facts: true
+  vars:
+    compliance_banner_baseline_text: "Authorized use only.\n"
+    compliance_banner_become: false
+    compliance_banner_owner: '{{ ansible_facts.user_id }}'
+    compliance_banner_group: '{{ ansible_facts.user_id }}'
+    snmp_policy_service: auto-lab-nonexistent-snmp-fixture.service
+  tasks:
+    - name: Require actual CLI check mode
+      ansible.builtin.assert:
+        that: [ansible_check_mode]
+
+    - name: Create a disposable fixture despite check mode
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_exception_preview_
+      check_mode: false
+      register: exception_preview_directory
+
+    - name: Exercise the full role in check mode
+      block:
+        - name: Select disposable paths and an approved disabled service
+          ansible.builtin.set_fact:
+            compliance_banner_target_path: '{{ exception_preview_directory.path }}/issue'
+            snmp_policy_path: '{{ exception_preview_directory.path }}/snmpd.conf'
+            compliance_exceptions_group:
+              - id: PREVIEW-GROUP
+                control: snmp_service
+                profile: linux_demo
+                group: ungrouped
+                status: approved
+                kind: alternate
+                reason: Keep the disposable service absent.
+                approved_by: fixture_reviewer
+                ticket: PREVIEW-001
+                expires: '2099-12-31'
+                value:
+                  enabled: false
+
+        - name: Create real banner drift for the preview
+          ansible.builtin.copy:
+            dest: '{{ compliance_banner_target_path }}'
+            content: "Unapproved preview.\n"
+            mode: '0600'
+          check_mode: false
+
+        - name: Preview exception-aware remediation
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+          vars:
+            compliance_exceptions_operation: remediate
+
+        - name: Read actual content after preview
+          ansible.builtin.slurp:
+            src: '{{ compliance_banner_target_path }}'
+          register: exception_preview_content
+
+        - name: Inspect actual metadata after preview
+          ansible.builtin.stat:
+            path: '{{ compliance_banner_target_path }}'
+          register: exception_preview_stat
+
+        - name: Require actual drift to remain and no false repair claim
+          ansible.builtin.assert:
+            that:
+              - exception_preview_content.content | b64decode == "Unapproved preview.\n"
+              - exception_preview_stat.stat.mode == '0600'
+              - compliance_exceptions_result.check_mode
+              - compliance_exceptions_result.controls.console_login_banner.disposition == 'drift'
+              - compliance_banner_result.predicted_change
+      always:
+        - name: Remove only the disposable fixture
+          ansible.builtin.file:
+            path: '{{ exception_preview_directory.path }}'
+            state: absent
+          check_mode: false

@@ -1,0 +1,53 @@
+# Selected-control exception report
+
+Run: {{ policy_report_resolved_run_id }}
+
+This is a custom report for three demo controls, not a CIS score or full benchmark assessment.
+An approved waiver accepts risk; it is not a pass. Missing evidence is never a pass.
+Observations are point-in-time checks. The JSON retains before/after evidence for this run.
+
+| Server | Control | Result | Exception scope | Exception ID |
+| --- | --- | --- | --- | --- |
+{% for host in policy_report_expected_hosts | sort %}
+{% for control in policy_report_expected_controls %}
+{% set row = policy_report_results.get(host, {}).get('controls', {}).get(control) %}
+{% if row %}
+| {{ host }} | {{ control }} | {{ row.disposition }} | {{ row.resolution.scope }} | {{ row.resolution.exception.get('id', '—') }} |
+{% else %}
+| {{ host }} | {{ control }} | NO EVIDENCE | — | — |
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+{% for host in policy_report_expected_hosts | sort %}
+{% set result = policy_report_results.get(host) %}
+## {{ host }}
+{% if not result %}
+NO EVIDENCE: this expected host did not provide a result.
+{% else %}
+Profile: {{ result.profile }}; evaluated: {{ result.evaluated_at_utc }}
+Job/revision: {{ result.job_id }} / {{ result.project_revision }}
+Operation: {{ result.operation }}; check mode: {{ result.check_mode }}
+{% for control, row in result.controls.items() %}
+
+### {{ control }} — {{ row.disposition }}
+
+Baseline matches: {{ row.baseline_matches if row.baseline_matches is boolean else 'not evaluated' }}; effective configuration matches: {{ row.effective_matches if row.effective_matches is boolean else 'not evaluated' }}.
+{% if row.get('applicability_reason') %}
+{{ row.applicability_reason }}.
+{% endif %}
+{% if row.get('evidence_note') %}
+{{ row.evidence_note }}.
+{% endif %}
+{% if row.resolution.exception %}
+{% set exception = row.resolution.exception %}
+Exception {{ exception.id }}: {{ exception.reason }}
+Approval: {{ exception.ticket }} by {{ exception.approved_by }}; status: {{ exception.status }}.
+Expires: {{ exception.expires }} (valid through this UTC date); kind: {{ exception.kind }}.
+{% if row.resolution.superseded_ids %}
+Superseded records: {{ row.resolution.superseded_ids | join(', ') }}.
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}

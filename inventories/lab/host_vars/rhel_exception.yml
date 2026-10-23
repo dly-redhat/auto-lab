@@ -11,3 +11,17 @@ compliance_banner_exception:
   expires: '2027-03-01'
   allowed_text: |
     Authorized application administrators only. Activity is monitored and recorded.
+
+# The new multi-control demo uses this waiver; the legacy banner playbook above
+# retains its original alternate-wording example.
+compliance_exceptions_control:
+  - id: DEMO-EXC-CONTROL-003
+    control: console_login_banner
+    profile: linux_demo
+    host: rhel_exception
+    status: approved
+    kind: waiver
+    reason: Application banner review is pending; record the actual deviation without enforcement.
+    approved_by: demo_security_reviewer
+    ticket: DEMO-CHG-003
+    expires: '2027-03-01'

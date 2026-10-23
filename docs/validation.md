@@ -293,3 +293,80 @@ and Controller playbook syntax in the explicitly selected supported runtime EE.
 The same tooling digest and runtime image ID documented above were used.
 The external Podman validation VM was stopped afterward. This is a Project sync
 pass and configuration validation, not a successful inventory import or policy job.
+
+## Three-scope exception preparation — 2026-10-23
+
+The user confirmed the AAP subscription remains expired and requested external
+preparation and validation. The new [exception demo](exception-demo.md) implements
+three selected controls on the same two RHEL guests. It is not a full CIS
+assessment. No Controller changes, Git push, or managed-host remediation were
+performed for this milestone.
+
+All Ansible validation ran through Navigator on the Mac. Runtime selection was
+the supported EE at registry digest
+`sha256:563d524b17ece380ed4392adfc3bb98b7e3340d0c9daac3e6f7db28bce026e68`,
+locally selected by image ID
+`sha256:d0ec1ac135c1eb831bb6c5fa6784e9ebebc407bec6141823b89c665b2a65f511`.
+Lint used the existing ARM64 tooling EE at
+`ghcr.io/ansible/community-ansible-dev-tools@sha256:b0d93c387531363921868482042dbe22f141056b1f8bd4b3647dc224bbb51feb`.
+No new collection dependency was added.
+
+| Check | Observed result |
+| --- | --- |
+| YAML and production Ansible lint | Passed; 73 files, zero failures or warnings |
+| Python exception resolver tests inside runtime EE | All 12 passed |
+| All ten playbook and five test entry point syntax checks | Passed |
+| Inventory graph | Two RHEL hosts; `rhel_exception` also belongs to `database_servers` |
+| Exception fixture integration | 264 OK, zero failures; one expected rescued expiry rejection |
+| Exception check-mode fixture | 52 OK, zero failures; actual banner contents unchanged |
+| Existing banner, report, and check-mode regressions | Passed: 192, 21, and 24 OK respectively |
+| Live external audit | Both RHEL hosts: 31 OK, zero configuration changes, zero failures |
+| Saved report fetch | Passed; regular files with mode `0600` verified before fetching |
+
+Fixtures cover scope precedence, conflicting approvals, expiry and revocation,
+waiver non-enforcement, actual banner repair and repeat-run idempotence, private
+community comparisons, detection of a `public` configuration, and missing evidence
+including an entirely missing result set. The runtime container has no usable
+service manager: its service result is deliberately `unknown`. These tests do
+not validate a running SNMP daemon, package installation, service restart, or
+SNMP service idempotence.
+
+External preflight found neither RHEL guest has `net-snmp` installed or an enabled
+DNF repository. No community credentials were supplied to the live audit. Its
+actual results are:
+
+| Host | SNMP service | SNMP community | Console banner |
+| --- | --- | --- | --- |
+| `rhel_standard` | `drift` | `unknown` | `pass` |
+| `rhel_exception` | `approved_deviation` | `not_applicable` | `approved_waiver` |
+
+The six-row report and JSON scope manifest are saved on `rhel_standard` at
+`/var/tmp/auto-lab-reports/exceptions_20261023/`, with local presentation copies
+under ignored `artifacts/exception-demo-evidence/`. Reports retain actual
+observations; missing checks use `not_evaluated`, never an invented pass.
+These external runs identify their revision as `unrecorded_local_revision`;
+they do not claim execution of a committed Controller project revision.
+
+The Controller overlay and secret credential configuration have passed lint and
+syntax checks only. Subscription renewal, an exact reviewed Git revision, private
+credentials, and RHEL package access remain prerequisites for Controller execution
+and live SNMP repair. Credential injection, workflow artifact propagation for the
+new controls, daemon behavior, and live SNMP repeat-run idempotence still require
+functional validation. No schedule or continuous-monitoring guarantee is established.
+
+## Subscription update and inventory retry — 2026-10-23
+
+After the user updated the license, a TLS-verified Controller API read confirmed
+`valid_key: true`, `compliant: true`, and `date_expired: false`. The installed
+subscription is a trial with approximately 15 days remaining at verification.
+Retrying the previously authorized inventory synchronization created update 68,
+which completed successfully against the existing Project pin
+`225a3c5b0621a542ce45b31c754cd88421b4ebbe`. Subsequent reads verified exactly
+`rhel_standard` and `rhel_exception`, with the existing `demo_targets` and `rhel`
+groups. Oracle remains absent.
+
+This resolves the licensing blocker and the failed inventory import. The new
+exception implementation is still local and unpushed; no new Project pin,
+credential, workflow, or managed-host remediation was applied. Package access,
+private SNMP credentials, and functional validation remain outstanding for live
+SNMP repair.

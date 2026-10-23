@@ -1,0 +1,4 @@
+# Managed by the selected-policy Ansible demonstration.
+agentaddress udp:{{ snmp_policy_listen_address }}:{{ snmp_policy_port }}
+view demo included .1.3.6.1.2.1.1
+rocommunity {{ snmp_policy_render_community }} {{ snmp_policy_source }} -V demo

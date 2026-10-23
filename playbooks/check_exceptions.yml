@@ -1,0 +1,8 @@
+---
+- name: Assess selected controls and their approved exceptions
+  hosts: demo_targets
+  gather_facts: true
+  serial: 1
+  roles:
+    - role: compliance_exceptions
+      compliance_exceptions_operation: audit

@@ -1,0 +1,64 @@
+---
+- name: Inspect current service state without changing it
+  ansible.builtin.service_facts:
+  register: snmp_policy_service_query
+
+- name: Distinguish unavailable service evidence from an absent service
+  ansible.builtin.set_fact:
+    snmp_policy_services: '{{ ansible_facts.services | default({}) }}'
+    snmp_policy_service_evidence: >-
+      {{ not snmp_policy_service_query.skipped | default(false) and
+         'services' in ansible_facts }}
+
+- name: Inspect the SNMP configuration path without following links
+  become: true
+  ansible.builtin.stat:
+    path: '{{ snmp_policy_path }}'
+    follow: false
+    get_checksum: false
+    get_mime: false
+  register: snmp_policy_stat
+
+- name: Reject unsafe or unexpectedly large configuration paths
+  ansible.builtin.assert:
+    that:
+      - >-
+        not snmp_policy_stat.stat.exists or
+        (snmp_policy_stat.stat.isreg | default(false) and
+         snmp_policy_stat.stat.size | default(0) <= 65536)
+    fail_msg: The managed SNMP path must be a regular file of at most 64 KiB or absent.
+
+- name: Read existing configuration privately
+  become: true
+  ansible.builtin.slurp:
+    src: '{{ snmp_policy_path }}'
+  register: snmp_policy_content
+  no_log: true
+  when: snmp_policy_stat.stat.exists
+
+- name: Compare actual state with approved configuration without exposing strings
+  ansible.builtin.set_fact:
+    snmp_policy_observed:
+      service_evidence: '{{ snmp_policy_service_evidence }}'
+      service_present: '{{ snmp_policy_service in snmp_policy_services }}'
+      running: >-
+        {{ snmp_policy_services.get(snmp_policy_service, {}).get('state') == 'running' }}
+      enabled: >-
+        {{ snmp_policy_services.get(snmp_policy_service, {}).get('status') == 'enabled' }}
+      disabled: >-
+        {{ snmp_policy_service not in snmp_policy_services or
+           snmp_policy_services[snmp_policy_service].status in
+           ['disabled', 'masked', 'not-found'] }}
+      configuration_exists: '{{ snmp_policy_stat.stat.exists }}'
+      permissions_match: >-
+        {{ snmp_policy_stat.stat.exists and
+           snmp_policy_stat.stat.mode == snmp_policy_mode[-4:] and
+           snmp_policy_stat.stat.pw_name | default('') == snmp_policy_owner and
+           snmp_policy_stat.stat.gr_name | default('') == snmp_policy_group }}
+      effective_configuration_matches: >-
+        {{ snmp_policy_credentials_available and snmp_policy_stat.stat.exists and
+           snmp_policy_content.content | default('') | b64decode == snmp_policy_effective_config }}
+      baseline_configuration_matches: >-
+        {{ snmp_policy_credentials_available and snmp_policy_stat.stat.exists and
+           snmp_policy_content.content | default('') | b64decode == snmp_policy_baseline_config }}
+  no_log: true

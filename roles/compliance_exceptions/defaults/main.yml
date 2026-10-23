@@ -1,0 +1,7 @@
+---
+compliance_exceptions_operation: audit
+compliance_exceptions_profile: linux_demo
+compliance_exceptions_group: []
+compliance_exceptions_host: []
+compliance_exceptions_control: []
+compliance_exceptions_controls: [snmp_service, snmp_community, console_login_banner]

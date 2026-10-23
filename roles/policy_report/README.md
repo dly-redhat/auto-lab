@@ -24,3 +24,10 @@ The entry-point play uses Ansible's implicit localhost connection. Do not set
 `connection: local` at play level: delegated writes would inherit it and could
 land inside the disposable EE. Report hosts must use their actual inventory
 connection. Verify persistence by fetching the files in a separate EE invocation.
+# Multi-control reports
+
+Use `policy_report_format: controls` with `policy_report_expected_controls` and
+host records from `compliance_exceptions`. JSON contains an expected-scope manifest
+and `results`; Markdown emits every expected host/control, with `NO EVIDENCE` for
+missing observations. The default `banner` format retains the original JSON shape.
+See [the exception demo](../../docs/exception-demo.md) for result semantics.

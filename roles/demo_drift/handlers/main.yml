@@ -1,0 +1,6 @@
+---
+- name: Activate intentional loopback SNMP drift
+  become: true
+  ansible.builtin.systemd_service:
+    name: '{{ demo_drift_snmp_service }}'
+    state: restarted

@@ -1,0 +1,80 @@
+---
+- name: Validate supported SNMP policy inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'RedHat'
+      - ansible_facts.distribution_major_version == '9'
+      - snmp_policy_operation in ['audit', 'remediate']
+      - snmp_policy_enabled is boolean
+      - snmp_policy_baseline_enabled is boolean
+      - snmp_policy_path.startswith('/')
+      - snmp_policy_mode is match('^0[0-7]{3}$')
+      - snmp_policy_listen_address is match('^[0-9.]+$')
+      - snmp_policy_source is match('^[0-9./]+$')
+      - snmp_policy_port | int > 0
+      - snmp_policy_port | int <= 65535
+      - snmp_policy_communities is mapping
+    fail_msg: Supply supported RHEL 9 SNMP policy inputs.
+
+- name: Resolve credential availability
+  ansible.builtin.set_fact:
+    snmp_policy_credentials_available: >-
+      {{ snmp_policy_community_ref in snmp_policy_communities and
+         snmp_policy_baseline_community_ref in snmp_policy_communities }}
+    snmp_policy_effective_config: ''
+    snmp_policy_baseline_config: ''
+  no_log: true
+
+- name: Validate credentials before rendering the constrained configuration
+  ansible.builtin.assert:
+    that:
+      - snmp_policy_communities[snmp_policy_community_ref] is match('^[A-Za-z0-9_-]{8,64}$')
+      - >-
+        snmp_policy_communities[snmp_policy_baseline_community_ref]
+        is match('^[A-Za-z0-9_-]{8,64}$')
+      - snmp_policy_communities[snmp_policy_community_ref] | lower not in ['public', 'private']
+    fail_msg: >-
+      Supply non-default community strings of 8-64 alphanumeric, underscore, or hyphen characters.
+  no_log: true
+  when: snmp_policy_credentials_available
+
+- name: Render the effective approved configuration privately
+  ansible.builtin.set_fact:
+    snmp_policy_effective_config: '{{ lookup("ansible.builtin.template", "snmpd.conf.j2") }}'
+  vars:
+    snmp_policy_render_community: '{{ snmp_policy_communities[snmp_policy_community_ref] }}'
+  no_log: true
+  when: snmp_policy_credentials_available
+
+- name: Render the baseline configuration privately
+  ansible.builtin.set_fact:
+    snmp_policy_baseline_config: '{{ lookup("ansible.builtin.template", "snmpd.conf.j2") }}'
+  vars:
+    snmp_policy_render_community: >-
+      {{ snmp_policy_communities[snmp_policy_baseline_community_ref] }}
+  no_log: true
+  when: snmp_policy_credentials_available
+
+- name: Observe SNMP before any change
+  ansible.builtin.include_tasks: inspect.yml
+
+- name: Retain before state
+  ansible.builtin.set_fact:
+    snmp_policy_before: '{{ snmp_policy_observed }}'
+
+- name: Require credentials before enabling or changing SNMP
+  ansible.builtin.assert:
+    that:
+      - snmp_policy_credentials_available
+    fail_msg: Supply SNMP credentials through approved private inputs before remediation.
+  when:
+    - snmp_policy_operation == 'remediate'
+    - snmp_policy_enabled
+    - snmp_policy_manage_community or snmp_policy_manage_service
+
+- name: Enforce approved state outside check mode
+  ansible.builtin.include_tasks: remediate.yml
+  when:
+    - snmp_policy_operation == 'remediate'
+    - not ansible_check_mode
+    - snmp_policy_service_evidence

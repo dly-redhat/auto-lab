@@ -1,0 +1,24 @@
+---
+- name: Assess the managed targets through the exception policy role
+  ansible.builtin.import_playbook: check_exceptions.yml
+
+- name: Consolidate the external demonstration evidence
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Start a fresh result map for this invocation
+      ansible.builtin.set_fact:
+        policy_report_results: {}
+
+    - name: Collect only hosts that actually returned evidence
+      ansible.builtin.set_fact:
+        policy_report_results: >-
+          {{ policy_report_results | combine({item: hostvars[item].compliance_exceptions_result}) }}
+      loop: '{{ groups["demo_targets"] }}'
+      when: hostvars[item].compliance_exceptions_result is defined
+
+    - name: Persist the complete expected-scope report
+      ansible.builtin.include_role:
+        name: policy_report
+      vars:
+        policy_report_format: controls

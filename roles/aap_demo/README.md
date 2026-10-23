@@ -31,3 +31,10 @@ private-key replacement. Rotate that key through an intentional credential chang
 Runtime approval authorizes execution, not new policy. Workflow failure, rejection,
 and timeout have no edge to remediation. The daily schedule remains disabled until
 report retention and ongoing operation are agreed.
+
+For the multi-control exception demo, use `controller/exception-demo.yml` as an
+extra-vars overlay and supply the exact pushed `aap_demo_revision`. The overlay's
+empty revision deliberately fails validation until a reviewed commit is provided.
+Supply `aap_demo_snmp_communities` privately with `standard` and `special` values.
+The role adds a secret custom credential and attaches it only to the selected
+exception audit/remediation templates. See [the runbook](../../docs/exception-demo.md).

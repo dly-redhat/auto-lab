@@ -1,0 +1,20 @@
+---
+snmp_policy_operation: audit
+snmp_policy_baseline_enabled: true
+snmp_policy_enabled: '{{ snmp_policy_baseline_enabled }}'
+snmp_policy_baseline_community_ref: standard
+snmp_policy_community_ref: '{{ snmp_policy_baseline_community_ref }}'
+# Supply these via a Controller custom credential, Vault, or private EE input.
+snmp_policy_communities: {}
+snmp_policy_manage_service: true
+snmp_policy_manage_community: true
+snmp_policy_package: net-snmp
+snmp_policy_service: snmpd.service
+snmp_policy_path: /etc/snmp/snmpd.conf
+snmp_policy_owner: root
+snmp_policy_group: root
+snmp_policy_mode: '0600'
+# The demonstration listens only on loopback; no firewall opening is required.
+snmp_policy_listen_address: 127.0.0.1
+snmp_policy_port: 161
+snmp_policy_source: 127.0.0.1

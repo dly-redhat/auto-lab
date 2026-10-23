@@ -1,0 +1,7 @@
+---
+- name: Publish evidence for every expected host and selected control
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: policy_report
+      policy_report_format: controls

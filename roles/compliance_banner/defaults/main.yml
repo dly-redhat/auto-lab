@@ -8,3 +8,4 @@ compliance_banner_group: root
 compliance_banner_file_mode: '0644'
 compliance_banner_become: true
 compliance_banner_exception: {}
+compliance_banner_publish: true

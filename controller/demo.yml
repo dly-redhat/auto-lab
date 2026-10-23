@@ -18,6 +18,8 @@ aap_demo_approver_team: Auto Lab Approvers
 aap_demo_workflow_remediate: Auto Lab | Approved remediation
 aap_demo_workflow_audit: Auto Lab | Scheduled audit and report
 aap_demo_approval_timeout: 600
+# Change through the reviewed exception-demo overlay after its code is pushed.
+aap_demo_policy_mode: banner
 aap_demo_schedule_rule: DTSTART:20260918T140000Z RRULE:FREQ=DAILY;INTERVAL=1
 aap_demo_jobs:
   - name: Auto Lab | Pre-check targets
@@ -37,13 +39,19 @@ aap_demo_jobs:
           min: 30
           max: 300
   - name: Auto Lab | Check policy
-    playbook: playbooks/check_policy.yml
+    playbook: >-
+      {{ 'playbooks/check_exceptions.yml' if aap_demo_policy_mode == 'exceptions'
+         else 'playbooks/check_policy.yml' }}
     limit: demo_targets
   - name: Auto Lab | Remediate policy
-    playbook: playbooks/remediate_policy.yml
+    playbook: >-
+      {{ 'playbooks/remediate_exceptions.yml' if aap_demo_policy_mode == 'exceptions'
+         else 'playbooks/remediate_policy.yml' }}
     limit: demo_targets
   - name: Auto Lab | Report policy
-    playbook: playbooks/report_policy.yml
+    playbook: >-
+      {{ 'playbooks/report_exceptions.yml' if aap_demo_policy_mode == 'exceptions'
+         else 'playbooks/report_policy.yml' }}
     # The play selects implicit localhost; --limit localhost rejects an inventory
     # containing only managed guests before that implicit host is created.
     limit: ''
@@ -56,3 +64,6 @@ aap_demo_jobs:
     ask_variables_on_launch: true
     extra_vars:
       demo_drift_allowed: false
+      demo_drift_control: >-
+        {{ 'snmp_community' if aap_demo_policy_mode == 'exceptions'
+           else 'console_login_banner' }}

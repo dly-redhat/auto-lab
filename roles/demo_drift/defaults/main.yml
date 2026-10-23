@@ -1,4 +1,7 @@
 ---
 demo_drift_allowed: false
+demo_drift_control: console_login_banner
 demo_drift_target_path: /etc/issue
 demo_drift_text: "Demonstration drift: unapproved console notice.\n"
+demo_drift_snmp_path: /etc/snmp/snmpd.conf
+demo_drift_snmp_service: snmpd.service

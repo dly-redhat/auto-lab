@@ -1,0 +1,76 @@
+---
+- name: Require an existing configuration when community management is waived
+  ansible.builtin.assert:
+    that:
+      - snmp_policy_observed.configuration_exists
+    fail_msg: >-
+      Enabling SNMP with a waived community control requires an existing reviewed configuration.
+  when:
+    - snmp_policy_enabled
+    - snmp_policy_manage_service
+    - not snmp_policy_manage_community
+
+- name: Install the SNMP package when the approved policy enables it
+  become: true
+  ansible.builtin.package:
+    name: '{{ snmp_policy_package }}'
+    state: present
+  when:
+    - snmp_policy_enabled
+    - snmp_policy_manage_service
+
+- name: Deploy the approved SNMP configuration without logging credentials
+  become: true
+  ansible.builtin.template:
+    src: snmpd.conf.j2
+    dest: '{{ snmp_policy_path }}'
+    owner: '{{ snmp_policy_owner }}'
+    group: '{{ snmp_policy_group }}'
+    mode: '{{ snmp_policy_mode }}'
+    follow: false
+  vars:
+    snmp_policy_render_community: '{{ snmp_policy_communities[snmp_policy_community_ref] }}'
+  no_log: true
+  diff: false
+  notify: Restart the managed SNMP service after configuration changes
+  when:
+    - snmp_policy_enabled
+    - snmp_policy_manage_community
+    - snmp_policy_manage_service
+
+- name: Enforce the approved service state and boot behavior
+  become: true
+  ansible.builtin.systemd_service:
+    name: '{{ snmp_policy_service }}'
+    state: '{{ "started" if snmp_policy_enabled else "stopped" }}'
+    enabled: '{{ snmp_policy_enabled }}'
+  when:
+    - snmp_policy_manage_service
+    - snmp_policy_enabled or snmp_policy_observed.service_present
+
+- name: Activate changed configuration before verifying it
+  ansible.builtin.meta: flush_handlers
+
+- name: Read back configuration and service state
+  ansible.builtin.include_tasks: inspect.yml
+
+- name: Verify the enforced service policy
+  ansible.builtin.assert:
+    that:
+      - >-
+        (snmp_policy_observed.running and snmp_policy_observed.enabled)
+        if snmp_policy_enabled else
+        (not snmp_policy_observed.running and snmp_policy_observed.disabled)
+    fail_msg: SNMP service state did not converge to approved policy.
+  when: snmp_policy_manage_service
+
+- name: Verify the enforced community configuration
+  ansible.builtin.assert:
+    that:
+      - snmp_policy_observed.effective_configuration_matches
+      - snmp_policy_observed.permissions_match
+    fail_msg: SNMP configuration did not converge to approved policy.
+  when:
+    - snmp_policy_enabled
+    - snmp_policy_manage_community
+    - snmp_policy_manage_service

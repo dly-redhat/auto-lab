@@ -1,0 +1,279 @@
+---
+- name: Exercise group and control exceptions with real file observations in the EE
+  hosts: localhost
+  gather_facts: true
+  vars:
+    compliance_banner_baseline_text: "Authorized use only.\n"
+    compliance_banner_become: false
+    compliance_banner_owner: '{{ ansible_facts.user_id }}'
+    compliance_banner_group: '{{ ansible_facts.user_id }}'
+    snmp_policy_owner: '{{ ansible_facts.user_id }}'
+    snmp_policy_group: '{{ ansible_facts.user_id }}'
+    # A non-existent unit ensures the test never touches an EE service.
+    snmp_policy_service: auto-lab-nonexistent-snmp-fixture.service
+  tasks:
+    - name: Create an isolated fixture directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_exceptions_
+      register: exception_test_directory
+
+    - name: Exercise the exception and reporting contract
+      block:
+        - name: Select disposable configuration paths and scoped approvals
+          ansible.builtin.set_fact:
+            compliance_banner_target_path: '{{ exception_test_directory.path }}/issue'
+            snmp_policy_path: '{{ exception_test_directory.path }}/snmpd.conf'
+            compliance_exceptions_group:
+              - id: FIXTURE-GROUP
+                control: snmp_service
+                profile: linux_demo
+                group: ungrouped
+                status: approved
+                kind: alternate
+                reason: Fixture service must be off.
+                approved_by: fixture_reviewer
+                ticket: FIXTURE-001
+                expires: '2099-12-31'
+                value:
+                  enabled: false
+            compliance_exceptions_control:
+              - id: FIXTURE-WAIVER
+                control: console_login_banner
+                profile: linux_demo
+                host: localhost
+                status: approved
+                kind: waiver
+                reason: Observe fixture drift without correcting it.
+                approved_by: fixture_reviewer
+                ticket: FIXTURE-002
+                expires: '2099-12-31'
+
+        - name: Seed an unapproved banner
+          ansible.builtin.copy:
+            dest: '{{ compliance_banner_target_path }}'
+            content: "Unexpected warning.\n"
+            mode: '0644'
+
+        - name: Enforce the disabled service while respecting the banner waiver
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+          vars:
+            compliance_exceptions_operation: remediate
+
+        - name: Verify waiver and not-applicable semantics
+          ansible.builtin.assert:
+            that:
+              - >-
+                compliance_exceptions_result.controls.snmp_service.disposition == 'unknown'
+              - >-
+                compliance_exceptions_result.controls.snmp_community.disposition == 'not_applicable'
+              - >-
+                compliance_exceptions_result.controls.console_login_banner.disposition
+                == 'approved_waiver'
+              - >-
+                not compliance_exceptions_result.controls.console_login_banner.baseline_matches
+
+        - name: Read the waived banner after attempted enforcement
+          ansible.builtin.slurp:
+            src: '{{ compliance_banner_target_path }}'
+          register: exception_test_waived_file
+
+        - name: Require actual waived content to remain unchanged
+          ansible.builtin.assert:
+            that:
+              - exception_test_waived_file.content | b64decode == "Unexpected warning.\n"
+
+        - name: Render a report including a host with missing evidence
+          ansible.builtin.include_role:
+            name: policy_report
+          vars:
+            policy_report_format: controls
+            policy_report_host: localhost
+            policy_report_directory: '{{ exception_test_directory.path }}/reports'
+            policy_report_run_id: exception_fixture
+            policy_report_expected_hosts: [localhost, absent_host]
+            policy_report_results: '{{ {"localhost": compliance_exceptions_result} }}'
+
+        - name: Read the persisted report
+          ansible.builtin.slurp:
+            src: '{{ exception_test_directory.path }}/reports/exception_fixture/report.md'
+          register: exception_test_report
+
+        - name: Require every expected control and explicit missing evidence
+          ansible.builtin.assert:
+            that:
+              - "'approved_waiver' in (exception_test_report.content | b64decode)"
+              - "'unknown' in (exception_test_report.content | b64decode)"
+              - "'not_applicable' in (exception_test_report.content | b64decode)"
+              - >-
+                '| absent_host | snmp_service | NO EVIDENCE'
+                in (exception_test_report.content | b64decode)
+              - >-
+                '| absent_host | snmp_community | NO EVIDENCE'
+                in (exception_test_report.content | b64decode)
+              - >-
+                '| absent_host | console_login_banner | NO EVIDENCE'
+                in (exception_test_report.content | b64decode)
+
+        - name: Render explicit coverage even when every host lacks evidence
+          ansible.builtin.include_role:
+            name: policy_report
+          vars:
+            policy_report_format: controls
+            policy_report_host: localhost
+            policy_report_directory: '{{ exception_test_directory.path }}/reports'
+            policy_report_run_id: all_missing
+            policy_report_expected_hosts: [absent_host]
+            policy_report_results: {}
+
+        - name: Read the all-missing machine-readable report
+          ansible.builtin.slurp:
+            src: '{{ exception_test_directory.path }}/reports/all_missing/results.json'
+          register: exception_test_all_missing
+
+        - name: Require an expected-scope manifest and no invented results
+          ansible.builtin.assert:
+            that:
+              - (exception_test_all_missing.content | b64decode | from_json).results == {}
+              - >-
+                (exception_test_all_missing.content | b64decode | from_json).expected_hosts
+                == ['absent_host']
+
+        - name: Expire the waiver
+          ansible.builtin.set_fact:
+            compliance_exceptions_control: >-
+              {{ [compliance_exceptions_control[0] | combine({'expires': '2000-01-01'})] }}
+
+        - name: Verify expired records block remediation before any write
+          block:
+            - name: Attempt enforcement with expired approval
+              ansible.builtin.include_role:
+                name: compliance_exceptions
+              vars:
+                compliance_exceptions_operation: remediate
+          rescue:
+            - name: Record the expected approval rejection
+              ansible.builtin.set_fact:
+                exception_test_expiry_blocked: >-
+                  {{ 'review it before remediation' in ansible_failed_result.msg | default('') }}
+
+        - name: Require the explicit expiration guard
+          ansible.builtin.assert:
+            that:
+              - exception_test_expiry_blocked | default(false)
+
+        - name: Remove the waiver and apply the normal banner requirement
+          ansible.builtin.set_fact:
+            compliance_exceptions_control: []
+
+        - name: Enforce the reviewed baseline after waiver removal
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+          vars:
+            compliance_exceptions_operation: remediate
+
+        - name: Verify successful banner repair retains the original drift
+          ansible.builtin.assert:
+            that:
+              - compliance_exceptions_result.controls.console_login_banner.disposition == 'pass'
+              - >-
+                not compliance_exceptions_result.controls.console_login_banner.before
+                .baseline_text_matches
+              - >-
+                compliance_exceptions_result.controls.console_login_banner.observed
+                .baseline_text_matches
+
+        - name: Repeat enforcement
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+          vars:
+            compliance_exceptions_operation: remediate
+
+        - name: Require idempotent banner enforcement
+          ansible.builtin.assert:
+            that:
+              - not compliance_banner_write.changed
+
+        - name: Remove the disabled-service exception for audit only
+          ansible.builtin.set_fact:
+            compliance_exceptions_group: []
+
+        - name: Observe missing service and missing credentials honestly
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+
+        - name: Require drift and unknown rather than invented passes
+          ansible.builtin.assert:
+            that:
+              - compliance_exceptions_result.controls.snmp_service.disposition == 'unknown'
+              - compliance_exceptions_result.controls.snmp_community.disposition == 'unknown'
+
+        - name: Define ephemeral credentials and an approved host exception
+          ansible.builtin.set_fact:
+            snmp_policy_communities:
+              standard: '{{ (exception_test_directory.path ~ "standard") | hash("sha256") }}'
+              special: '{{ (exception_test_directory.path ~ "special") | hash("sha256") }}'
+            compliance_exceptions_host:
+              - id: FIXTURE-HOST
+                control: snmp_community
+                profile: linux_demo
+                host: localhost
+                status: approved
+                kind: alternate
+                reason: Verify the exact approved alternate credential.
+                approved_by: fixture_reviewer
+                ticket: FIXTURE-003
+                expires: '2099-12-31'
+                value:
+                  community_ref: special
+          no_log: true
+
+        - name: Seed the approved alternate configuration in the disposable directory
+          ansible.builtin.template:
+            src: ../roles/snmp_policy/templates/snmpd.conf.j2
+            dest: '{{ snmp_policy_path }}'
+            mode: '0600'
+          vars:
+            snmp_policy_render_community: '{{ snmp_policy_communities.special }}'
+          no_log: true
+          diff: false
+
+        - name: Observe the actual alternate community fixture
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+
+        - name: Require an approved deviation for the matching alternate
+          ansible.builtin.assert:
+            that:
+              - >-
+                compliance_exceptions_result.controls.snmp_community.disposition
+                == 'approved_deviation'
+              - not compliance_exceptions_result.controls.snmp_community.baseline_matches
+              - compliance_exceptions_result.controls.snmp_community.effective_matches
+              - snmp_policy_communities.special not in compliance_exceptions_result | to_json
+              - snmp_policy_communities.standard not in compliance_exceptions_result | to_json
+          no_log: true
+
+        - name: Seed the unapproved public value only in the disposable fixture
+          ansible.builtin.template:
+            src: ../roles/snmp_policy/templates/snmpd.conf.j2
+            dest: '{{ snmp_policy_path }}'
+            mode: '0600'
+          vars:
+            snmp_policy_render_community: public
+
+        - name: Detect drift outside the approved host exception
+          ansible.builtin.include_role:
+            name: compliance_exceptions
+
+        - name: Require drift despite the approved exception record
+          ansible.builtin.assert:
+            that:
+              - compliance_exceptions_result.controls.snmp_community.disposition == 'drift'
+              - compliance_exceptions_result.controls.snmp_community.resolution.active
+      always:
+        - name: Remove only this disposable fixture directory
+          ansible.builtin.file:
+            path: '{{ exception_test_directory.path }}'
+            state: absent

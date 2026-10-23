@@ -1,0 +1,15 @@
+---
+# Synthetic policy classification; this does not install a database.
+compliance_exceptions_group:
+  - id: DEMO-EXC-GROUP-001
+    control: snmp_service
+    profile: linux_demo
+    group: database_servers
+    status: approved
+    kind: alternate
+    reason: Database security policy requires SNMP to remain disabled.
+    approved_by: demo_security_reviewer
+    ticket: DEMO-CHG-001
+    expires: '2027-03-01'
+    value:
+      enabled: false

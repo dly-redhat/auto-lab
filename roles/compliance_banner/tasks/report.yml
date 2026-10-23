@@ -40,3 +40,4 @@
       compliance_results: '{{ {inventory_hostname: compliance_banner_result} }}'
     per_host: false
     aggregate: true
+  when: compliance_banner_publish

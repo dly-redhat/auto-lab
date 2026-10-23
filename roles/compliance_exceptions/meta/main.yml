@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: auto_lab
+  description: Evaluate reviewed group, host, and control exceptions for selected demo policies
+  license: MIT
+  min_ansible_version: '2.16'
+dependencies: []
