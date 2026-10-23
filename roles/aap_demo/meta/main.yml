@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: auto_lab
+  description: Configure the isolated AAP policy demonstration through supported APIs
+  license: MIT
+  min_ansible_version: '2.16'
+dependencies: []

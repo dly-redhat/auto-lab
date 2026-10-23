@@ -1,0 +1,5 @@
+---
+# Supply paths through a private, read-only EE mount; never commit their contents.
+aap_demo_ca_file: /run/aap-session/ca.crt
+aap_demo_machine_key_file: /run/aap-session/fleet_key
+aap_demo_known_hosts_file: '{{ playbook_dir }}/../artifacts/m5_guest_known_hosts'

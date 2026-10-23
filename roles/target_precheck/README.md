@@ -1,6 +1,7 @@
 # Managed target pre-check
 
-Read-only readiness checks for the three RHEL/Oracle Linux 9 KVM demo guests.
+Read-only readiness checks for the managed Linux 9 KVM demo guests. The current
+demo inventory contains two RHEL guests.
 The role verifies distribution, virtualization, enforcing SELinux, Python over
 SSH, completed cloud-init without errors, and effective root access through sudo.
 It has no collection dependencies and makes no configuration changes.

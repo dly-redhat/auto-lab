@@ -1,0 +1,66 @@
+---
+# Controller collection 4.8.6 incorrectly applies node associations to the
+# approval template when both are supplied together. Create it separately.
+- name: Configure the approval template without node associations
+  ansible.controller.workflow_job_template_node:
+    identifier: approval
+    workflow_job_template: '{{ aap_demo_workflow_remediate }}'
+    organization: '{{ aap_demo_organization }}'
+    approval_node:
+      name: Approve reviewed policy remediation
+      description: Approves this execution only; policy and exceptions require Git review.
+      timeout: '{{ aap_demo_approval_timeout }}'
+    state: present
+
+# Create children before parents so edges always reference existing node identifiers.
+- name: Build the approved remediation path from report back to pre-check
+  ansible.controller.workflow_job_template_node:
+    identifier: '{{ item.identifier }}'
+    workflow_job_template: '{{ aap_demo_workflow_remediate }}'
+    organization: '{{ aap_demo_organization }}'
+    unified_job_template: '{{ item.job | default(omit) }}'
+    success_nodes: '{{ item.success | default([]) }}'
+    failure_nodes: []
+    always_nodes: []
+    state: present
+  loop:
+    - identifier: report
+      job: Auto Lab | Report policy
+    - identifier: verify
+      job: Auto Lab | Check policy
+      success: [report]
+    - identifier: remediate
+      job: Auto Lab | Remediate policy
+      success: [verify]
+    - identifier: approval
+      success: [remediate]
+    - identifier: check
+      job: Auto Lab | Check policy
+      success: [approval]
+    - identifier: precheck
+      job: Auto Lab | Pre-check targets
+      success: [check]
+  loop_control:
+    label: '{{ item.identifier }}'
+
+- name: Build the read-only scheduled audit path
+  ansible.controller.workflow_job_template_node:
+    identifier: '{{ item.identifier }}'
+    workflow_job_template: '{{ aap_demo_workflow_audit }}'
+    organization: '{{ aap_demo_organization }}'
+    unified_job_template: '{{ item.job }}'
+    success_nodes: '{{ item.success | default([]) }}'
+    failure_nodes: []
+    always_nodes: []
+    state: present
+  loop:
+    - identifier: report
+      job: Auto Lab | Report policy
+    - identifier: check
+      job: Auto Lab | Check policy
+      success: [report]
+    - identifier: precheck
+      job: Auto Lab | Pre-check targets
+      success: [check]
+  loop_control:
+    label: '{{ item.identifier }}'

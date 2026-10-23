@@ -1,0 +1,8 @@
+---
+# External Controller bootstrap only; managed-host playbooks remain built-in only.
+collections:
+  - name: ansible.controller
+    version: '4.8.6'
+  - name: ansible.platform
+    version: '2.7.20260812'
+roles: []

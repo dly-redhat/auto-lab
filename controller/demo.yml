@@ -1,0 +1,58 @@
+---
+aap_demo_url: https://rhel-m5.lan
+aap_demo_organization: Auto Lab
+aap_demo_project: Auto Lab | Policy Demo
+aap_demo_inventory: Auto Lab | Managed targets
+aap_demo_inventory_source: Auto Lab | Git inventory
+aap_demo_revision: 93605e91180e8eca0b690dc386e7ffc98a36ac43
+aap_demo_repository: https://github.com/dly-redhat/auto-lab.git
+aap_demo_ee_name: Auto Lab | Supported RHEL 9 pinned
+aap_demo_ee_image: >-
+  registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9@sha256:563d524b17ece380ed4392adfc3bb98b7e3340d0c9daac3e6f7db28bce026e68
+aap_demo_machine_credential: Auto Lab | Guest SSH
+aap_demo_machine_user: aapdemo
+aap_demo_trust_type: Auto Lab | SSH host trust
+aap_demo_trust_credential: Auto Lab | Verified guest host keys
+aap_demo_operator_team: Auto Lab Operators
+aap_demo_approver_team: Auto Lab Approvers
+aap_demo_workflow_remediate: Auto Lab | Approved remediation
+aap_demo_workflow_audit: Auto Lab | Scheduled audit and report
+aap_demo_approval_timeout: 600
+aap_demo_schedule_rule: DTSTART:20260918T140000Z RRULE:FREQ=DAILY;INTERVAL=1
+aap_demo_jobs:
+  - name: Auto Lab | Pre-check targets
+    playbook: playbooks/precheck_targets.yml
+    limit: demo_targets
+    survey_enabled: true
+    survey_spec:
+      name: Guest readiness
+      description: Bound the wait for guest initialization.
+      spec:
+        - question_name: Cloud-init wait timeout in seconds
+          question_description: Wait for first-boot initialization before policy jobs.
+          variable: target_precheck_cloud_init_timeout
+          type: integer
+          required: true
+          default: 180
+          min: 30
+          max: 300
+  - name: Auto Lab | Check policy
+    playbook: playbooks/check_policy.yml
+    limit: demo_targets
+  - name: Auto Lab | Remediate policy
+    playbook: playbooks/remediate_policy.yml
+    limit: demo_targets
+  - name: Auto Lab | Report policy
+    playbook: playbooks/report_policy.yml
+    # The play selects implicit localhost; --limit localhost rejects an inventory
+    # containing only managed guests before that implicit host is created.
+    limit: ''
+    extra_vars:
+      policy_report_host: rhel_standard
+      policy_report_expected_hosts: [rhel_standard, rhel_exception]
+  - name: Auto Lab | Seed intentional drift - admin only
+    playbook: playbooks/seed_demo_drift.yml
+    limit: rhel_standard
+    ask_variables_on_launch: true
+    extra_vars:
+      demo_drift_allowed: false

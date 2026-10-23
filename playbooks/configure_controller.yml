@@ -1,0 +1,17 @@
+---
+- name: Configure the isolated AAP demo from the external development device
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../controller/demo.yml
+  environment:
+    CONTROLLER_HOST: '{{ aap_demo_url }}'
+    CONTROLLER_OAUTH_TOKEN: '{{ aap_demo_token }}'
+    CONTROLLER_VERIFY_SSL: 'true'
+    GATEWAY_HOSTNAME: '{{ aap_demo_url }}'
+    GATEWAY_API_TOKEN: '{{ aap_demo_token }}'
+    GATEWAY_VERIFY_SSL: 'true'
+    SSL_CERT_FILE: '{{ aap_demo_ca_file }}'
+    REQUESTS_CA_BUNDLE: '{{ aap_demo_ca_file }}'
+  roles:
+    - role: aap_demo

@@ -20,7 +20,7 @@ this milestone does not configure the SSH `Banner` directive.
 4. AAP synchronizes its Project from Git and runs against managed demo targets.
 
 M5 is not a remediation target. No development checkout belongs on M5. The
-lab inventory contains the verified NAT addresses of the three isolated guests.
+lab inventory contains the verified NAT addresses of the two isolated RHEL guests.
 External access requires the Mac-only jump-host overlay described in
 [managed-target provisioning](docs/managed-targets.md).
 Supply SSH identities through AAP machine credentials or your external SSH agent;
@@ -36,11 +36,13 @@ verification enabled and establish trust before the first run.
 | `roles/compliance_banner/` | Policy validation, checks, remediation, verification, evidence |
 | `roles/policy_report/` | Consolidated Markdown and JSON evidence |
 | `roles/demo_drift/` | Explicitly authorized demonstration drift |
-| `inventories/lab/` | Managed RHEL/Oracle guests, baseline, and one scoped exception |
+| `roles/aap_demo/` | External bootstrap of isolated Controller objects and permissions |
+| `controller/` | Reviewed Controller configuration and certified bootstrap dependencies |
+| `inventories/lab/` | Two managed RHEL guests, baseline, and one scoped exception |
 | `tests/` | Disposable EE-local behavior tests; not a managed-host certification |
 | `docs/` | AAP configuration, demonstration steps, and validation record |
 | `ansible-navigator.yml` | Supported runtime EE pinned by digest |
-| `requirements.yml` | Explicitly empty third-party dependency list |
+| `requirements.yml` | Empty managed-host dependency list; workload uses built-ins |
 
 ## First run
 
