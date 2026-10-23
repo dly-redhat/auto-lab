@@ -406,3 +406,59 @@ register them interactively. Repository enablement, actual SNMP installation,
 protocol checks, controlled live drift/repair, and live repeat-run idempotence
 remain pending that prerequisite. The new drift action has passed lint and syntax
 checks but has not yet been exercised against a running SNMP service.
+
+## Live SNMP exception demonstration — 2026-10-23
+
+After the user registered the guests, external Navigator preflight verified both
+registrations and confirmed RHEL 9 BaseOS/AppStream repositories were enabled. No additional
+repository change was needed. All runs used the explicitly selected supported
+runtime EE recorded above; development and Navigator execution stayed on the Mac.
+Controller remained pinned to `d7d2d71bac52ba63304483ca4ba2804c7cd5c508`.
+
+External remediation installed and configured SNMP on `rhel_standard`: 69 OK,
+four changes, zero failures. `rhel_exception` had 43 OK, zero changes, and zero
+failures. Its group-approved disabled policy and control waiver were preserved.
+An independent protocol check verified the actual UDP listener was restricted to
+`127.0.0.1:161`, the approved host community answered, and `public` did not.
+The first protocol check installed `net-snmp-utils` on the standard guest for
+these probes; subsequent probes made zero changes.
+
+| Controller checkpoint | Workflow / job | Saved report | Observed result |
+| --- | --- | --- | --- |
+| Clean assessment | Workflow 77, assessment 79 | 80 | All six rows match the documented policy/exception dispositions |
+| Deliberate drift | Seed job 81 | — | `public` answers; approved private community does not |
+| Drift assessment | Workflow 82, assessment 84 | 85 | Standard host community reports `drift`; other rows unchanged |
+| Approved repair | Workflow 86, repair 90, verification 91 | 92 | Approved community restored; two changed tasks on standard host, zero on exception host |
+| Repeat remediation | Workflow 93, repair 97, verification 98 | 99 | Zero configuration changes on both guests; all six expected dispositions retained |
+
+Workflow 86 was observed waiting at approval 89 with remediation not started.
+The authorized test approved that gate before repair ran. A post-repair protocol
+check passed with six OK, zero changes, and zero failures: the approved community
+answered and `public` was rejected again. No intentional SNMP drift remains.
+The repeat workflow also waited for approval 96 before remediation; repair job 97
+proved live idempotence on both guests.
+
+Reports are persisted on `rhel_standard` beneath
+`/var/tmp/auto-lab-reports/<report-job-id>/`, each containing `report.md` and
+`results.json`. Local copies are under ignored
+`artifacts/exception-controller-evidence/`. Report 85 preserves the detected
+drift; report 92 preserves the subsequent verification. Repair job 90 separately
+retains its original mismatch and final matching configuration in job artifacts.
+The local `repair-job-results.json` copy preserves those repair artifacts.
+All five saved assessments (including initial pre-installation report 76) matched
+Controller artifacts and contained the expected two-host, three-control manifest.
+Assessment jobs changed neither guest. The waived banner observations remained
+unchanged across every stage. A scan of assessment, repair, and report job output
+found neither generated private community value.
+The temporary deployment API token was revoked and its subsequent request was
+rejected with HTTP 401. Private token/community staging files were removed;
+Controller retains the credential required for the demo jobs.
+
+Only documentation changed after runtime validation. Local Markdown link targets
+and `git diff --check` passed; the Controller runtime pin was not advanced for
+these documentation updates.
+
+These are three selected controls on two hosts, not a full CIS assessment.
+The waived banner remains a visible accepted deviation, not a pass. Controller
+execution uses an approval gate; the audit schedule is still disabled. Continuous
+monitoring, Remedy tickets, and Tenable integration are not implemented.

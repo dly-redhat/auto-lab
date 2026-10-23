@@ -1,5 +1,11 @@
 # AAP configuration and demonstration
 
+This page describes the original banner-only configuration. The live lab now uses
+the [group, host, and control exception demo](exception-demo.md) through
+`controller/exception-demo.yml`, with the same template and workflow names.
+Use that runbook for the current presentation; running this page's bootstrap
+without the exception overlay selects the original banner configuration.
+
 ## Prerequisites
 
 - External Navigator validation passed and reviewed code pushed by the user.
@@ -20,8 +26,8 @@ to operations. No report parser or external ticket integration is implemented.
 
 The external bootstrap is `playbooks/configure_controller.yml`, with environment
 data in `controller/demo.yml` and reusable implementation in `roles/aap_demo/`.
-It creates objects in the isolated **Auto Lab** organization. The Project uses
-the public HTTPS Git repository and pins reviewed commit
+It creates objects in the isolated **Auto Lab** organization. The banner-only
+configuration uses the public HTTPS Git repository and pins reviewed commit
 `225a3c5b0621a542ce45b31c754cd88421b4ebbe`. Project updates and branch overrides
 at launch are disabled. Advance that revision deliberately after the user pushes
 and the new runtime content passes external validation.

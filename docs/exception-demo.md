@@ -26,23 +26,30 @@ The same schema also supports a server-specific SNMP-disabled alternate: put a
 precedence over group records. An alternate is actively enforced; a waiver
 suppresses enforcement but retains observations and never becomes a pass.
 
-## Current prerequisites
+## Current readiness
 
-On October 23, external read-only checks confirmed both RHEL guests are reachable,
-but neither has `net-snmp` installed or any enabled DNF repository. External
-preparation and validation completed while AAP's subscription was expired.
-Later that day, the user updated the subscription; API checks confirmed an active,
-compliant trial and inventory update 68 succeeded against the existing pinned
-revision. The exception runtime has since been pushed as
-`d7d2d71bac52ba63304483ca4ba2804c7cd5c508`; Controller activation results are recorded
-in [the validation log](validation.md).
+On October 23, 2026, both RHEL guests were verified registered, with BaseOS and
+AppStream repositories enabled. The renewed AAP trial is active. Controller is
+pinned to validated runtime commit
+`d7d2d71bac52ba63304483ca4ba2804c7cd5c508` and injects the two community values
+through a private credential.
 
-Consequently, an actual audit may correctly show SNMP service drift on the
-standard host and unknown community evidence without credentials. These results
-must not be replaced by the expected-state table above. Live SNMP service repair
-requires approved RHEL package access, two private community credentials, and
-functional testing. Controller's exception overlay selects the pushed runtime
-revision and supplies community values through a private credential.
+SNMP is installed, enabled, and running on the standard host, listening only on
+`127.0.0.1:161` for this demonstration. It uses the host's approved alternate
+community. The exception host keeps SNMP disabled. Live Controller runs proved
+the clean assessment, deliberate `public` drift, and approved repair; actual
+SNMP queries verified the community before and after repair. The banner waiver
+remained visible throughout. See [the validation log](validation.md) for results.
+Repeat remediation made zero configuration changes on both guests.
+
+Existing report checkpoints are 80 (clean), 85 (drift), 92 (repaired), and 99
+(unchanged repeat), saved on `rhel_standard` under
+`/var/tmp/auto-lab-reports/<report-job-id>/`. Each directory contains `report.md`
+and `results.json`. Repair job 90 also records the original and final match flags.
+
+This is a loopback demonstration, not a remotely reachable monitoring endpoint.
+Reports retain the observed state, including drift or missing evidence if a
+future run cannot verify the required configuration.
 
 ## External assessment and report
 
@@ -72,12 +79,13 @@ when a selected exception is expired, pending, or revoked.
 1. Show the inventory's `database_servers` membership and group approval.
 2. Show the standard host's alternate credential reference and host approval.
 3. Show the other host's banner control waiver, approver, ticket, and expiry.
-4. Run the external audit/report and explain its actual six host/control rows.
+4. Launch **Auto Lab | Scheduled audit and report** in Controller and explain
+   its actual six host/control rows. Manual launch works while its schedule is disabled.
 5. Show that the waived banner is still inspected and its mismatch remains visible.
 6. Show the isolated test results: approved alternate vs unapproved `public`,
    expiry/revocation, conflict rejection, waiver non-enforcement, banner repair,
    idempotence, and explicit missing evidence. Label these as fixtures.
-7. Once prerequisites are ready, apply approved policy and run a clean audit.
+7. Show the clean audit checkpoint before introducing drift.
 8. Launch **Auto Lab | Seed intentional drift - admin only** with
    `demo_drift_allowed: true`. In exception mode this changes the standard host's
    loopback-only SNMP community to `public` and restarts the service.
@@ -117,8 +125,9 @@ the existing private authentication/key mounts. Supply
 The overlay selects the new audit, remediation, and report entry points under
 the existing constrained templates/workflows. It uses an exact revision
 and adds a secret Controller credential only to the audit/remediation templates.
-The operator approval boundary and disabled schedule remain in place. Actual
-credential injection and workflow execution must be tested after activation.
+The operator approval boundary and disabled schedule remain in place. Credential
+injection and workflow execution have been verified on this deployment; repeat
+those checks when deploying to another environment.
 
 Continue managing approved policy through Git review. Editing variables directly
 in an SCM-managed AAP inventory can be overwritten on sync, and broad extra vars

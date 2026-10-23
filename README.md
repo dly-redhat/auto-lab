@@ -1,12 +1,13 @@
 # AAP policy remediation demo
 
-The new [group, host, and control exception demo](docs/exception-demo.md) adds
+The live [group, host, and control exception demo](docs/exception-demo.md) uses
 SNMP service/community policies and an observed banner waiver on the two RHEL
-guests. It has separate entry points; the original banner-only demo remains below.
-See the runbook for package-access and AAP subscription prerequisites.
+guests. It checks desired configuration directly and retains assessment/repair
+evidence. Tenable can provide independent secondary validation; scanner and ticket
+integrations are not implemented. Use the linked runbook for the Controller demo.
 
-This repository demonstrates the hand-off after a security team receives a
-Tenable finding: check the current setting, resolve an approved host exception,
+The original banner-only exercise below demonstrates the hand-off after a
+representative finding: check the current setting, resolve an approved host exception,
 remediate through AAP, verify the result, and retain evidence.
 
 The first implemented control is the **console login warning banner** at
@@ -39,11 +40,13 @@ verification enabled and establish trust before the first run.
 | `playbooks/` | Thin pre-check, check, remediate, report, and opt-in drift entry points |
 | `roles/target_precheck/` | Read-only guest identity, initialization, and access checks |
 | `roles/compliance_banner/` | Policy validation, checks, remediation, verification, evidence |
+| `roles/compliance_exceptions/` | Resolve group, host, and control approvals and publish evidence |
+| `roles/snmp_policy/` | Audit and enforce the selected SNMP service/community configuration |
 | `roles/policy_report/` | Consolidated Markdown and JSON evidence |
 | `roles/demo_drift/` | Explicitly authorized demonstration drift |
 | `roles/aap_demo/` | External bootstrap of isolated Controller objects and permissions |
 | `controller/` | Reviewed Controller configuration and certified bootstrap dependencies |
-| `inventories/lab/` | Two managed RHEL guests, baseline, and one scoped exception |
+| `inventories/lab/` | Two managed RHEL guests, baseline, and scoped exception records |
 | `tests/` | Disposable EE-local behavior tests; not a managed-host certification |
 | `docs/` | AAP configuration, demonstration steps, and validation record |
 | `ansible-navigator.yml` | Supported runtime EE pinned by digest |
