@@ -9,6 +9,9 @@
     rhc_insights:
       state: present
       remediation: absent
+      tags:
+        owner: dly 
+        project: auto-lab-veolia
 
 - name: Confirm the host is registered locally
   ansible.builtin.stat:
