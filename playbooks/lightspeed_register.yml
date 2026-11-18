@@ -1,0 +1,6 @@
+---
+- name: Connect the demo targets to Red Hat Lightspeed for vulnerability data
+  hosts: demo_targets
+  gather_facts: false
+  roles:
+    - role: lightspeed_register

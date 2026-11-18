@@ -1,0 +1,25 @@
+---
+- name: Connect to Red Hat Lightspeed for data collection only (no remote fixes)
+  ansible.builtin.include_role:
+    name: redhat.rhel_system_roles.rhc
+    apply:
+      become: true
+  vars:
+    rhc_state: present
+    rhc_insights:
+      state: present
+      remediation: absent
+      tags:
+        owner: dly 
+        project: auto-lab-veolia
+
+- name: Confirm the host is registered locally
+  ansible.builtin.stat:
+    path: /etc/insights-client/.registered
+  register: lightspeed_register_marker
+  become: true
+
+- name: Fail if registration did not stick
+  ansible.builtin.assert:
+    that: lightspeed_register_marker.stat.exists
+    fail_msg: insights-client registration did not complete on this host.

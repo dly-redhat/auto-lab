@@ -1,0 +1,7 @@
+---
+- name: Collect security-relevant facts from the demo targets 
+  hosts: demo_targets
+  gather_facts: true
+  roles: 
+    - role: security_facts
+

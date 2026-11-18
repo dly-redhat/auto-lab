@@ -1,0 +1,24 @@
+---
+- name: Find the most recently installed or updated package
+  ansible.builtin.command:
+    cmd: rpm -qa --last
+  register: security_facts_rpm_last
+  changed_when: false
+  check_mode: false
+
+- name: Build the security record from gathered facts
+  ansible.builtin.set_fact:
+    security_facts_record:
+      host: "{{ inventory_hostname }}"
+      hostname: "{{ ansible_facts.hostname }}"
+      os: "{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
+      kernel: "{{ ansible_facts.kernel }}"
+      last_package_change: "{{ security_facts_rpm_last.stdout_lines | first | default('unknown') }}"
+
+- name: Add CVE counts from Red Hat Lightspeed
+  ansible.builtin.include_tasks: lightspeed_cves.yml
+  when: security_facts_lightspeed_enabled | bool
+
+- name: Show the security record
+  ansible.builtin.debug:
+    var: security_facts_record

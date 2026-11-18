@@ -1,0 +1,63 @@
+---
+- name: Get a Lightspeed access token (once per run)
+  ansible.builtin.uri:
+    url: "{{ security_facts_sso_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      scope: api.console
+      client_id: "{{ security_facts_lightspeed_client_id }}"
+      client_secret: "{{ security_facts_lightspeed_client_secret }}"
+  register: security_facts_token
+  delegate_to: localhost
+  run_once: true
+  check_mode: false
+  no_log: true
+
+- name: Find this host in the vulnerability service
+  ansible.builtin.uri:
+    url: "{{ security_facts_vulnerability_api }}/systems?filter={{ security_facts_display_name | urlencode }}"
+    headers:
+      Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+  register: security_facts_vuln_systems
+  delegate_to: localhost
+  check_mode: false
+  no_log: true
+
+- name: Keep only the exact name match (the org is shared with other SAs)
+  ansible.builtin.set_fact:
+    security_facts_vuln_matches: >-
+      {{ security_facts_vuln_systems.json.data
+         | selectattr('attributes.display_name', 'equalto', security_facts_display_name)
+         | list }}
+
+- name: Require exactly one match
+  ansible.builtin.assert:
+    that: security_facts_vuln_matches | length == 1
+    fail_msg: >-
+      Expected exactly one Lightspeed system named {{ security_facts_display_name }},
+      found {{ security_facts_vuln_matches | length }}.
+
+- name: Count Critical (7) and Important (5) CVEs for this host
+  ansible.builtin.uri:
+    url: "{{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?impact={{ item.code }}&page_size=1"
+    headers:
+      Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+  loop:
+    - { name: critical, code: 7 }
+    - { name: important, code: 5 }
+  register: security_facts_cve_counts
+  delegate_to: localhost
+  check_mode: false
+  no_log: true
+
+- name: Add the CVE counts to the security record
+  ansible.builtin.set_fact:
+    security_facts_record: >-
+      {{ security_facts_record | combine({
+           'lightspeed_inventory_id': security_facts_vuln_matches[0].id,
+           'cve_total': security_facts_vuln_matches[0].attributes.cve_count,
+           'cve_critical': security_facts_cve_counts.results[0].json.meta.total_items,
+           'cve_important': security_facts_cve_counts.results[1].json.meta.total_items
+         }) }}
