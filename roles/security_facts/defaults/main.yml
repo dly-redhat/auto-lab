@@ -1,0 +1,13 @@
+---
+# Turn the Lightspeed CVE lookup on or off. 
+security_facts_lightspeed_enabled: true
+
+# Read from environment variables
+security_facts_lightspeed_client_id: "{{ lookup('ansible.builtin.env', 'LIGHTSPEED_CLIENT_ID') }}"
+security_facts_lightspeed_client_secret: "{{ lookup('ansible.builtin.env', 'LIGHTSPEED_CLIENT_SECRET') }}"
+
+security_facts_sso_token_url: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
+security_facts_vulnerability_api: https://console.redhat.com/api/vulnerability/v1
+
+# The name Lightspeed knows this host by: the hostname inside the VM, not the inventory name.
+security_facts_display_name: "{{ ansible_facts.hostname }}"

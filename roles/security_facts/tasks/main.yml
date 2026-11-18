@@ -15,6 +15,10 @@
       kernel: "{{ ansible_facts.kernel }}"
       last_package_change: "{{ security_facts_rpm_last.stdout_lines | first | default('unknown') }}"
 
+- name: Add CVE counts from Red Hat Lightspeed
+  ansible.builtin.include_tasks: lightspeed_cves.yml
+  when: security_facts_lightspeed_enabled | bool
+
 - name: Show the security record
   ansible.builtin.debug:
     var: security_facts_record
