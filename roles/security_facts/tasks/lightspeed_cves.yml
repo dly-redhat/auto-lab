@@ -39,25 +39,83 @@
       Expected exactly one Lightspeed system named {{ security_facts_display_name }},
       found {{ security_facts_vuln_matches | length }}.
 
-- name: Count Critical (7) and Important (5) CVEs for this host
+- name: Count CVEs per bucket (Red Hat severity x advisory available)
   ansible.builtin.uri:
-    url: "{{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?impact={{ item.code }}&page_size=1"
+    url: >-
+      {{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?page_size=1&{{ item.query }}
     headers:
       Authorization: "Bearer {{ security_facts_token.json.access_token }}"
-  loop:
-    - { name: critical, code: 7 }
-    - { name: important, code: 5 }
+  loop: "{{ security_facts_cve_buckets }}"
+  loop_control:
+    label: "{{ item.name }}"
   register: security_facts_cve_counts
   delegate_to: localhost
   check_mode: false
   no_log: true
 
-- name: Add the CVE counts to the security record
+- name: Turn the bucket counts into a lookup table
+  ansible.builtin.set_fact:
+    security_facts_cve: >-
+      {{ dict(security_facts_cve_counts.results
+              | map(attribute='item.name')
+              | zip(security_facts_cve_counts.results
+                    | map(attribute='json.meta.total_items'))) }}
+
+- name: Check the buckets add up (catches an API filter being ignored)
+  ansible.builtin.assert:
+    that:
+      - >-
+        security_facts_cve.fixable_critical + security_facts_cve.fixable_important +
+        security_facts_cve.fixable_moderate + security_facts_cve.fixable_low
+        == security_facts_vuln_matches[0].attributes.cve_count
+    fail_msg: Per-severity fixable counts do not add up to Lightspeed's total for this host.
+
+- name: List the known-exploit CVEs on this host
+  ansible.builtin.uri:
+    url: >-
+      {{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?known_exploit=true&page_size=50
+    headers:
+      Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+  register: security_facts_exploit_list
+  delegate_to: localhost
+  check_mode: false
+  no_log: true
+
+- name: Start with an empty exploit list
+  ansible.builtin.set_fact:
+    security_facts_exploits: []
+
+- name: Keep the details we show for each exploited CVE
+  ansible.builtin.set_fact:
+    security_facts_exploits: >-
+      {{ security_facts_exploits + [{
+           'cve': item.attributes.synopsis | default(item.id),
+           'severity': security_facts_impact_names[item.attributes.impact] | default(item.attributes.impact),
+           'fix': item.attributes.advisory_available | bool,
+           'host': security_facts_display_name
+         }] }}
+  loop: "{{ security_facts_exploit_list.json.data }}"
+  loop_control:
+    label: "{{ item.attributes.synopsis | default(item.id) }}"
+
+- name: Add the CVE picture to the security record
   ansible.builtin.set_fact:
     security_facts_record: >-
       {{ security_facts_record | combine({
            'lightspeed_inventory_id': security_facts_vuln_matches[0].id,
-           'cve_total': security_facts_vuln_matches[0].attributes.cve_count,
-           'cve_critical': security_facts_cve_counts.results[0].json.meta.total_items,
-           'cve_important': security_facts_cve_counts.results[1].json.meta.total_items
+           'lightspeed_last_upload': security_facts_vuln_matches[0].attributes.last_upload,
+           'lightspeed_last_evaluation': security_facts_vuln_matches[0].attributes.last_evaluation,
+           'fixable_critical': security_facts_cve.fixable_critical,
+           'fixable_important': security_facts_cve.fixable_important,
+           'fixable_moderate': security_facts_cve.fixable_moderate,
+           'fixable_low': security_facts_cve.fixable_low,
+           'patch_now': security_facts_cve.fixable_critical + security_facts_cve.fixable_important,
+           'patch_later': security_facts_cve.fixable_moderate + security_facts_cve.fixable_low,
+           'fixable_total': security_facts_vuln_matches[0].attributes.cve_count,
+           'no_fix_critical_important': security_facts_cve.no_fix_critical + security_facts_cve.no_fix_important,
+           'no_fix_total': security_facts_cve.no_fix_total,
+           'known_exploit': security_facts_cve.known_exploit,
+           'exploit_with_fix': security_facts_cve.exploit_with_fix,
+           'exploit_no_fix': security_facts_cve.known_exploit - security_facts_cve.exploit_with_fix,
+           'known_exploit_cves': security_facts_exploits
          }) }}

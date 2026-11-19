@@ -6,14 +6,27 @@
   changed_when: false
   check_mode: false
 
+- name: Find the newest package install time (seconds since 1970)
+  ansible.builtin.command:
+    cmd: rpm -qa --queryformat '%{INSTALLTIME}\n'
+  register: security_facts_rpm_times
+  changed_when: false
+  check_mode: false
+
 - name: Build the security record from gathered facts
   ansible.builtin.set_fact:
     security_facts_record:
       host: "{{ inventory_hostname }}"
       hostname: "{{ ansible_facts.hostname }}"
       os: "{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
+      fqdn: "{{ ansible_facts.fqdn }}"
+      ip: "{{ ansible_facts.default_ipv4.address | default('n/a') }}"
       kernel: "{{ ansible_facts.kernel }}"
       last_package_change: "{{ security_facts_rpm_last.stdout_lines | first | default('unknown') }}"
+      last_package_change_date: "{{ '%Y-%m-%d' | strftime(security_facts_last_epoch | int) }}"
+      days_since_package_change: "{{ ((ansible_facts.date_time.epoch | int - security_facts_last_epoch | int) / 86400) | int }}"
+  vars:
+    security_facts_last_epoch: "{{ security_facts_rpm_times.stdout_lines | map('int') | max }}"
 
 - name: Add CVE counts from Red Hat Lightspeed
   ansible.builtin.include_tasks: lightspeed_cves.yml

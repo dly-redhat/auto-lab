@@ -1,0 +1,7 @@
+---
+security_dashboard_title: Security Dashboard
+security_dashboard_demo_banner: true
+security_dashboard_hosts: "{{ groups['demo_targets'] }}"
+security_dashboard_report_host: rhel_standard
+security_dashboard_directory: /var/tmp/auto-lab-reports
+security_dashboard_web_port: 8080
