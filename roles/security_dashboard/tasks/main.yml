@@ -1,0 +1,53 @@
+---
+- name: Gather every host's security record from this run
+  ansible.builtin.set_fact:
+    security_dashboard_records: >-
+      {{ security_dashboard_hosts
+         | map('extract', hostvars)
+         | selectattr('security_facts_record', 'defined')
+         | map(attribute='security_facts_record')
+         | list }}
+    security_dashboard_generated: "{{ now(utc=true, fmt='%Y-%m-%d %H:%M UTC') }}"
+    security_dashboard_run_id: "{{ awx_job_id | default(now(utc=true, fmt='local-%Y%m%dT%H%M%SZ')) }}"
+
+- name: Require a complete record (with CVE counts) for every host
+  ansible.builtin.assert:
+    that:
+      - security_dashboard_records | length == security_dashboard_hosts | length
+      - security_dashboard_records | selectattr('patch_now', 'undefined') | list | length == 0
+    fail_msg: Some hosts are missing a security record or CVE counts; the dashboard would be incomplete.
+
+- name: Create this run's report directory on the report host
+  ansible.builtin.file:
+    path: "{{ security_dashboard_directory }}/{{ security_dashboard_run_id }}"
+    state: directory
+    mode: '0700'
+  delegate_to: "{{ security_dashboard_report_host }}"
+
+- name: Render the dashboard
+  ansible.builtin.template:
+    src: dashboard.html.j2
+    dest: "{{ security_dashboard_directory }}/{{ security_dashboard_run_id }}/dashboard.html"
+    mode: '0600'
+  delegate_to: "{{ security_dashboard_report_host }}"
+
+- name: Show a summary in the job output
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.hostname }}: {{ item.patch_now }} to patch now, {{ item.known_exploit }} known exploits,
+      {{ item.patch_later }} next window, {{ item.no_fix_critical_important }} critical/important with no fix,
+      last package change {{ item.last_package_change_date }} ({{ item.days_since_package_change }} days ago)
+  loop: "{{ security_dashboard_records }}"
+  loop_control:
+    label: "{{ item.host }}"
+
+- name: Publish the report over HTTP and show its link
+  ansible.builtin.include_tasks: publish.yml
+  
+- name: Record where the dashboard was saved
+  ansible.builtin.set_stats:
+    data:
+      security_dashboard_location: >-
+        {{ security_dashboard_report_host }}:{{ security_dashboard_directory }}/{{ security_dashboard_run_id }}/dashboard.html
+    per_host: false
+  

@@ -1,0 +1,60 @@
+---
+- name: Install a small web service that serves the reports folder (Python built-in, no new packages)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/auto-lab-reports.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=auto-lab report viewer
+      After=network-online.target
+
+      [Service]
+      User={{ hostvars[security_dashboard_report_host].ansible_user | default('aapdemo') }}
+      ExecStart=/usr/bin/python3 -m http.server {{ security_dashboard_web_port }} --bind 0.0.0.0 --directory {{ security_dashboard_directory }}
+      Restart=on-failure
+
+      [Install]
+      WantedBy=multi-user.target
+  register: security_dashboard_unit
+  become: true
+  delegate_to: "{{ security_dashboard_report_host }}"
+
+- name: Start the report web service and keep it on after reboots
+  ansible.builtin.systemd_service:
+    name: auto-lab-reports
+    state: "{{ 'restarted' if security_dashboard_unit is changed else 'started' }}"
+    enabled: true
+    daemon_reload: "{{ security_dashboard_unit is changed }}"
+  become: true
+  delegate_to: "{{ security_dashboard_report_host }}"
+
+- name: Check whether the firewall is running
+  ansible.builtin.command:
+    cmd: systemctl is-active firewalld
+  register: security_dashboard_firewalld
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  delegate_to: "{{ security_dashboard_report_host }}"
+
+- name: Open the report port in the firewall
+  ansible.posix.firewalld:
+    port: "{{ security_dashboard_web_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  become: true
+  delegate_to: "{{ security_dashboard_report_host }}"
+  when: security_dashboard_firewalld.rc == 0
+
+- name: Build the report link
+  ansible.builtin.set_fact:
+    security_dashboard_url: >-
+      http://{{ hostvars[security_dashboard_report_host].ansible_host }}:{{ security_dashboard_web_port }}/{{ security_dashboard_run_id }}/dashboard.html
+
+- name: Show the report link
+  ansible.builtin.debug:
+    msg:
+      - "Report: {{ security_dashboard_url }}"
+      - "From your Mac, first run: ssh -N -L {{ security_dashboard_web_port }}:{{ hostvars[security_dashboard_report_host].ansible_host }}:{{ security_dashboard_web_port }} diem@192.168.86.44"
+      - "Then open: http://localhost:{{ security_dashboard_web_port }}/{{ security_dashboard_run_id }}/dashboard.html"

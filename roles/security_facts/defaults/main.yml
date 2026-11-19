@@ -1,5 +1,5 @@
 ---
-# Turn the Lightspeed CVE lookup on or off. 
+# Turn the Lightspeed CVE lookup on or off.
 security_facts_lightspeed_enabled: true
 
 # Read from environment variables
@@ -11,3 +11,18 @@ security_facts_vulnerability_api: https://console.redhat.com/api/vulnerability/v
 
 # The name Lightspeed knows this host by: the hostname inside the VM, not the inventory name.
 security_facts_display_name: "{{ ansible_facts.hostname }}"
+
+# One API query per bucket. impact codes: 7 Critical, 5 Important, 4 Moderate, 2 Low.
+security_facts_cve_buckets:
+  - { name: fixable_critical, query: 'advisory_available=true&impact=7' }
+  - { name: fixable_important, query: 'advisory_available=true&impact=5' }
+  - { name: fixable_moderate, query: 'advisory_available=true&impact=4' }
+  - { name: fixable_low, query: 'advisory_available=true&impact=2' }
+  - { name: no_fix_critical, query: 'advisory_available=false&impact=7' }
+  - { name: no_fix_important, query: 'advisory_available=false&impact=5' }
+  - { name: no_fix_total, query: 'advisory_available=false' }
+  - { name: known_exploit, query: 'known_exploit=true' }
+  - { name: exploit_with_fix, query: 'known_exploit=true&advisory_available=true' }
+
+# Red Hat impact codes to names
+security_facts_impact_names: { 7: Critical, 5: Important, 4: Moderate, 2: Low }

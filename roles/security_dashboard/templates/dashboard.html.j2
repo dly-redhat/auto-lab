@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ security_dashboard_title }}</title>
+<style>
+  :root { --ink:#151515; --muted:#6a6e73; --line:#e4e6e9; --bg:#f5f6f8; --card:#fff;
+          --crit:#a30000; --imp:#ec7a08; --mod:#f4c145; --low:#c7c9cc; --accent:#ee0000; --ok:#3e8635; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family:"Red Hat Text",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif; font-size:14px; }
+  .wrap { max-width:1180px; margin:0 auto; padding:36px 32px 48px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid var(--accent); padding-bottom:18px; }
+  h1 { font-family:"Red Hat Display",-apple-system,Helvetica,Arial,sans-serif; font-size:30px; font-weight:700; margin:0; }
+  .gen { font-size:13px; color:var(--muted); margin-top:6px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:26px 0 22px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px 20px; }
+  .kpi .k { font-size:13px; color:var(--muted); font-weight:600; }
+  .kpi .v { font-family:"Red Hat Display",-apple-system,Helvetica,Arial,sans-serif; font-size:34px; font-weight:700; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .kpi .v.small { font-size:22px; padding-top:8px; }
+  .kpi .d { font-size:12px; color:var(--muted); margin-top:4px; }
+  .red { color:var(--crit); }
+  .split { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .tag { font-size:12px; font-weight:600; border-radius:999px; padding:3px 10px; }
+  .tag.fix { background:#e6f2e3; color:#2a6224; } .tag.nofix { background:#fbe7e5; color:#a30000; }
+  .grid2 { display:grid; grid-template-columns:1.25fr 1fr; gap:16px; margin-bottom:16px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px 22px; }
+  h2 { font-size:15px; font-weight:700; margin:0 0 4px; }
+  .hint { font-size:12px; color:var(--muted); margin:0 0 14px; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); margin-bottom:12px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .brow { display:grid; grid-template-columns:220px 1fr 48px; gap:12px; align-items:center; padding:9px 0; }
+  .bar { display:flex; height:16px; border-radius:4px; overflow:hidden; background:#eef0f2; }
+  .bar span { height:100%; }
+  .c { background:var(--crit); } .i { background:var(--imp); } .m { background:var(--mod); } .l { background:var(--low); }
+  .bn { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:12px; font-weight:600; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:0; }
+  td.n, th.n { text-align:right; }
+  .host { font-weight:700; white-space:nowrap; } .sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .chip { display:inline-block; font-size:12px; font-weight:700; padding:4px 11px; border-radius:999px; white-space:nowrap; }
+  .chip.red { background:#fbe7e5; color:#a30000; } .chip.amber { background:#fdefdc; color:#8f4700; } .chip.green { background:#e6f2e3; color:#2a6224; }
+  .sev { font-weight:600; } .sev.Critical { color:var(--crit); } .sev.Important { color:#b85c00; }
+  .stale { color:var(--crit); font-weight:700; }
+  .empty { color:var(--muted); font-size:13px; padding:8px 0; }
+  .pdf { font:inherit; font-size:13px; font-weight:600; color:var(--ink); background:var(--card);
+         border:1px solid #c7c9cc; border-radius:8px; padding:8px 16px; cursor:pointer; }
+  .pdf:hover { background:#eef0f2; }
+  @media print {
+    @page { size: landscape; margin: 10mm; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background:#fff; }
+    .wrap { max-width:none; padding:0; }
+    .pdf { display:none; }
+    .kpi, .panel, tr { break-inside: avoid; }
+  }
+  footer { margin-top:18px; font-size:12px; color:var(--muted); line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+{% set recs = security_dashboard_records | sort(attribute='patch_now', reverse=true) %}
+{% set os_versions = recs | map(attribute='os') | list %}
+{% set exploits = recs | map(attribute='known_exploit_cves') | flatten | list %}
+{% set exploit_ids = exploits | map(attribute='cve') | unique | list %}
+{% set exploit_fix_ids = exploits | selectattr('fix') | map(attribute='cve') | unique | list %}
+{% set widest = (recs | map(attribute='fixable_total') | max) if recs else 1 %}
+  <div class="top">
+    <div>
+      <h1>{{ security_dashboard_title }}</h1>
+      <div class="gen">Generated {{ security_dashboard_generated }}</div>
+    </div>
+    <button class="pdf" type="button" onclick="window.print()">Export to PDF</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="k">Systems</div>
+      <div class="v">{{ recs | length }}</div>
+      <div class="d">Managed by Ansible Automation Platform</div>
+    </div>
+    <div class="kpi">
+      <div class="k">OS versions</div>
+      <div class="v small">{% for v in os_versions | unique %}{{ v | replace('RedHat', 'RHEL') }} &times;{{ os_versions | select('equalto', v) | list | length }}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>
+    </div>
+    <div class="kpi">
+      <div class="k">Patch now</div>
+      <div class="v red">{{ recs | sum(attribute='patch_now') }}</div>
+      <div class="d">Critical &amp; Important findings with a Red Hat fix, all systems</div>
+    </div>
+    <div class="kpi">
+      <div class="k">Known exploits</div>
+      <div class="v red">{{ exploit_ids | length }}</div>
+      <div class="split">
+        <span class="tag fix">{{ exploit_fix_ids | length }} fix available</span>
+        <span class="tag nofix">{{ (exploit_ids | length) - (exploit_fix_ids | length) }} no fix yet</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>CVEs per machine</h2>
+      <p class="hint">CVEs that have a Red Hat fix available, by Red Hat severity</p>
+      <div class="legend"><span><i class="c"></i>Critical</span><span><i class="i"></i>Important</span><span><i class="m"></i>Moderate</span><span><i class="l"></i>Low</span></div>
+{% for r in recs %}
+{% set t = r.fixable_total if r.fixable_total else 1 %}
+      <div class="brow">
+        <div class="host">{{ r.hostname }}</div>
+        <div class="bar" style="width: {{ '%.1f' | format(100.0 * r.fixable_total / (widest or 1)) }}%">
+          <span class="c" style="width: {{ '%.2f' | format(100.0 * r.fixable_critical / t) }}%"></span>
+          <span class="i" style="width: {{ '%.2f' | format(100.0 * r.fixable_important / t) }}%"></span>
+          <span class="m" style="width: {{ '%.2f' | format(100.0 * r.fixable_moderate / t) }}%"></span>
+          <span class="l" style="width: {{ '%.2f' | format(100.0 * r.fixable_low / t) }}%"></span>
+        </div>
+        <div class="bn">{{ r.fixable_total }}</div>
+      </div>
+{% endfor %}
+    </div>
+
+    <div class="panel">
+      <h2>Known exploits</h2>
+      <p class="hint">CVEs with a public exploit; patch these first</p>
+{% if exploits %}
+      <table>
+        <tr><th>CVE</th><th>Severity</th><th>Red Hat fix</th><th>Systems</th></tr>
+{% for cve, rows in exploits | groupby('cve') %}
+        <tr>
+          <td><b>{{ cve }}</b></td>
+          <td><span class="sev {{ rows[0].severity }}">{{ rows[0].severity }}</span></td>
+          <td>{% if rows[0].fix %}<span class="tag fix">Available</span>{% else %}<span class="tag nofix">None yet</span>{% endif %}</td>
+          <td>{{ rows | length }}</td>
+        </tr>
+{% endfor %}
+      </table>
+{% else %}
+      <div class="empty">No known exploits on these systems.</div>
+{% endif %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Inventory and patch level</h2>
+    <p class="hint">One row per system, most urgent first</p>
+    <table>
+      <tr>
+        <th>System</th><th>OS</th><th>Kernel</th><th>Last patched</th>
+        <th class="n">Patch now</th><th class="n">Known exploits</th><th class="n">No fix yet</th><th>Status</th>
+      </tr>
+{% for r in recs %}
+{% set days = r.days_since_package_change | int %}
+      <tr>
+        <td><div class="host">{{ r.hostname }}</div><div class="sub">{{ r.fqdn }} &middot; {{ r.ip }}</div></td>
+        <td>{{ r.os | replace('RedHat', 'RHEL') }}</td>
+        <td>{{ r.kernel.split('.el')[0] }}</td>
+        <td>{{ r.last_package_change_date }}<div class="sub {{ 'stale' if days > 90 else '' }}">{{ days }} days ago</div></td>
+        <td class="n"><b>{{ r.patch_now }}</b><div class="sub">{{ r.fixable_critical }} crit &middot; {{ r.fixable_important }} imp</div></td>
+        <td class="n">{% if r.known_exploit > 0 %}<b class="red">{{ r.known_exploit }}</b>{% else %}0{% endif %}</td>
+        <td class="n">{{ r.no_fix_critical_important }}<div class="sub">crit + imp</div></td>
+        <td>
+{% if r.known_exploit > 0 or r.fixable_critical > 0 %}<span class="chip red">Action required</span>
+{% elif r.fixable_important > 0 %}<span class="chip amber">Patch soon</span>
+{% else %}<span class="chip green">Monitor</span>{% endif %}
+        </td>
+      </tr>
+{% endfor %}
+    </table>
+  </div>
+
+  <footer>
+    Severity is Red Hat's own rating for how each CVE affects RHEL. "Fix" means a Red Hat Security Advisory (RHSA) is available for the system.
+    "Last patched" is the newest package install or update on the system.
+  </footer>
+</div>
+</body>
+</html>
