@@ -1,0 +1,9 @@
+---
+- name: Collect security facts and CVE counts
+  ansible.builtin.import_playbook: security_facts.yml
+
+- name: Render the leadership dashboard
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: security_dashboard
