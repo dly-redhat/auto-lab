@@ -1,0 +1,121 @@
+---
+# ServiceNow CMDB as an inventory source. Runs only when
+# aap_demo_servicenow_enabled is true and the private aap_demo_servicenow
+# mapping (instance, username, password) is supplied outside Git.
+- name: Validate the private ServiceNow connection inputs
+  ansible.builtin.assert:
+    that:
+      - aap_demo_servicenow is mapping
+      - aap_demo_servicenow.instance is match('^https://[A-Za-z0-9.-]+\.service-now\.com/?$')
+      - aap_demo_servicenow.username | default('') | length > 0
+      - aap_demo_servicenow.password | default('') | length > 0
+    fail_msg: >-
+      Supply aap_demo_servicenow with instance (https://<name>.service-now.com),
+      username and password in the private extra-vars file.
+  no_log: true
+
+- name: Define the ServiceNow credential type used by the inventory and modules
+  ansible.controller.credential_type:
+    name: '{{ aap_demo_servicenow_credential_type }}'
+    kind: cloud
+    inputs:
+      fields:
+        - id: instance
+          label: Instance URL
+          type: string
+        - id: username
+          label: Username
+          type: string
+        - id: password
+          label: Password
+          type: string
+          secret: true
+      required: [instance, username, password]
+    injectors:
+      env:
+        SN_HOST: "{{ '{{ instance }}' }}"
+        SN_USERNAME: "{{ '{{ username }}' }}"
+        SN_PASSWORD: "{{ '{{ password }}' }}"
+    state: present
+
+- name: Store the ServiceNow connection in a Controller credential
+  ansible.controller.credential:
+    name: '{{ aap_demo_servicenow_credential }}'
+    organization: '{{ aap_demo_organization }}'
+    credential_type: '{{ aap_demo_servicenow_credential_type }}'
+    inputs: '{{ aap_demo_servicenow }}'
+    update_secrets: false
+    state: present
+  no_log: true
+
+- name: Create the CMDB-backed inventory
+  ansible.controller.inventory:
+    name: '{{ aap_demo_servicenow_inventory }}'
+    organization: '{{ aap_demo_organization }}'
+    description: Demo guests as recorded in the ServiceNow CMDB
+    state: present
+
+- name: Read the CMDB through the now.yml source in the Git project
+  ansible.controller.inventory_source:
+    name: '{{ aap_demo_servicenow_inventory_source }}'
+    inventory: '{{ aap_demo_servicenow_inventory }}'
+    organization: '{{ aap_demo_organization }}'
+    source: scm
+    source_project: '{{ aap_demo_project }}'
+    source_path: inventories/lab/now.yml
+    credential: '{{ aap_demo_servicenow_credential }}'
+    execution_environment: '{{ aap_demo_ee_name }}'
+    overwrite: true
+    overwrite_vars: true
+    # Every report reads the CMDB as it is at launch time.
+    update_on_launch: true
+    update_cache_timeout: 0
+    state: present
+
+- name: Create the CMDB sync and report job templates
+  ansible.controller.job_template:
+    name: '{{ item.name }}'
+    organization: '{{ aap_demo_organization }}'
+    project: '{{ aap_demo_project }}'
+    inventory: '{{ item.inventory }}'
+    execution_environment: '{{ aap_demo_ee_name }}'
+    credentials: '{{ item.credentials }}'
+    playbook: '{{ item.playbook }}'
+    limit: ''
+    job_type: run
+    forks: 3
+    timeout: 300
+    allow_simultaneous: false
+    become_enabled: false
+    ask_inventory_on_launch: false
+    ask_credential_on_launch: false
+    ask_scm_branch_on_launch: false
+    ask_limit_on_launch: false
+    ask_variables_on_launch: false
+    state: present
+  loop:
+    # Seeds and corrects the CMDB from the Git-reviewed host list.
+    - name: '{{ aap_demo_servicenow_sync_job }}'
+      playbook: playbooks/sync_cmdb.yml
+      inventory: '{{ aap_demo_inventory }}'
+      credentials:
+        - '{{ aap_demo_machine_credential }}'
+        - '{{ aap_demo_trust_credential }}'
+        - '{{ aap_demo_servicenow_credential }}'
+    # Reads hosts from the CMDB; the inventory source holds the ServiceNow login.
+    - name: '{{ aap_demo_servicenow_report_job }}'
+      playbook: playbooks/cmdb_report.yml
+      inventory: '{{ aap_demo_servicenow_inventory }}'
+      credentials:
+        - '{{ aap_demo_machine_credential }}'
+        - '{{ aap_demo_trust_credential }}'
+  loop_control:
+    label: '{{ item.name }}'
+  register: aap_demo_servicenow_jobs
+
+- name: Grant operators the read-only CMDB report only
+  ansible.controller.role_team_assignment:
+    team: '{{ aap_demo_operator_team }}'
+    role_definition: JobTemplate Execute
+    object_id: '{{ aap_demo_servicenow_jobs.results[1].id }}'
+    state: present

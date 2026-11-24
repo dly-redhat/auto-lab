@@ -1,0 +1,47 @@
+---
+# Runs per host after fact gathering. CMDB values come from the now.yml
+# inventory columns; actual values come from the host's own facts.
+- name: Compare this host's CMDB record with its gathered facts
+  ansible.builtin.set_fact:
+    cmdb_report_record:
+      host: '{{ inventory_hostname }}'
+      sys_id: '{{ sys_id | default("") }}'
+      cmdb_updated: '{{ sys_updated_on | default("") }}'
+      category: '{{ category | default("") }}'
+      environment: '{{ environment | default("") }}'
+      checks:
+        - field: Hostname
+          cmdb: '{{ cmdb_report_cmdb_hostname }}'
+          actual: '{{ ansible_facts.hostname }}'
+          match: '{{ cmdb_report_cmdb_hostname | lower == ansible_facts.hostname | lower }}'
+        - field: FQDN
+          cmdb: '{{ cmdb_report_cmdb_fqdn }}'
+          actual: '{{ ansible_facts.fqdn }}'
+          match: '{{ cmdb_report_cmdb_fqdn | lower == ansible_facts.fqdn | lower }}'
+        - field: IP address
+          cmdb: '{{ cmdb_report_cmdb_ip }}'
+          actual: '{{ cmdb_report_actual_ip }}'
+          match: '{{ cmdb_report_cmdb_ip == cmdb_report_actual_ip }}'
+        - field: OS version
+          cmdb: '{{ cmdb_report_cmdb_os_version }}'
+          actual: '{{ ansible_facts.distribution_version }}'
+          match: '{{ cmdb_report_cmdb_os_version == ansible_facts.distribution_version }}'
+      facts:
+        os: '{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}'
+        kernel: '{{ ansible_facts.kernel }}'
+        vcpus: '{{ ansible_facts.processor_vcpus }}'
+        memory_mb: '{{ ansible_facts.memtotal_mb }}'
+        uptime_days: '{{ (ansible_facts.uptime_seconds | int / 86400) | round(1) }}'
+        selinux: '{{ ansible_facts.selinux.mode | default(ansible_facts.selinux.status) }}'
+  vars:
+    cmdb_report_cmdb_hostname: '{{ host_name | default("") | string | trim }}'
+    cmdb_report_cmdb_fqdn: '{{ fqdn | default("") | string | trim }}'
+    cmdb_report_cmdb_ip: '{{ ip_address | default("") | string | trim }}'
+    cmdb_report_cmdb_os_version: '{{ os_version | default("") | string | trim }}'
+    cmdb_report_actual_ip: '{{ ansible_facts.default_ipv4.address | default("") }}'
+
+- name: List the fields where the CMDB disagrees with the host
+  ansible.builtin.set_fact:
+    cmdb_report_record: >-
+      {{ cmdb_report_record | combine({'drift': cmdb_report_record.checks
+         | rejectattr('match') | map(attribute='field') | list}) }}

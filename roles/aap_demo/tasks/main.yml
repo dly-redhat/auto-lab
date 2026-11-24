@@ -250,3 +250,7 @@
     rrule: '{{ aap_demo_schedule_rule }}'
     enabled: false
     state: present
+
+- name: Add the ServiceNow CMDB inventory, sync and report jobs
+  ansible.builtin.include_tasks: servicenow.yml
+  when: aap_demo_servicenow_enabled | bool

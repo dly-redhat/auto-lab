@@ -6,6 +6,9 @@ guests. It checks desired configuration directly and retains assessment/repair
 evidence. Tenable can provide independent secondary validation; scanner and ticket
 integrations are not implemented. Use the linked runbook for the Controller demo.
 
+The [ServiceNow CMDB demo](docs/servicenow-cmdb.md) uses a free ServiceNow developer
+instance as the inventory source, scans facts, and reports where the CMDB is out of date.
+
 The original banner-only exercise below demonstrates the hand-off after a
 representative finding: check the current setting, resolve an approved host exception,
 remediate through AAP, verify the result, and retain evidence.
@@ -43,14 +46,16 @@ verification enabled and establish trust before the first run.
 | `roles/compliance_exceptions/` | Resolve group, host, and control approvals and publish evidence |
 | `roles/snmp_policy/` | Audit and enforce the selected SNMP service/community configuration |
 | `roles/policy_report/` | Consolidated Markdown and JSON evidence |
+| `roles/cmdb_sync/` | Register the guests in the ServiceNow CMDB from their facts |
+| `roles/cmdb_report/` | Compare gathered facts with CMDB records in an HTML report |
 | `roles/demo_drift/` | Explicitly authorized demonstration drift |
 | `roles/aap_demo/` | External bootstrap of isolated Controller objects and permissions |
 | `controller/` | Reviewed Controller configuration and certified bootstrap dependencies |
-| `inventories/lab/` | Two managed RHEL guests, baseline, and scoped exception records |
+| `inventories/lab/` | Two managed RHEL guests, baseline, scoped exception records, and the ServiceNow CMDB source (`now.yml`) |
 | `tests/` | Disposable EE-local behavior tests; not a managed-host certification |
 | `docs/` | AAP configuration, demonstration steps, and validation record |
 | `ansible-navigator.yml` | Supported runtime EE pinned by digest |
-| `requirements.yml` | Empty managed-host dependency list; workload uses built-ins |
+| `requirements.yml` | `servicenow.itsm` for the CMDB inventory and sync; other workloads use built-ins |
 
 ## First run
 

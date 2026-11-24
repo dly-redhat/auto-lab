@@ -1,0 +1,13 @@
+---
+# CMDB class for the registered guests; inventories/lab/now.yml reads the same table.
+cmdb_sync_table: cmdb_ci_linux_server
+# Prefix that marks records owned by this demo; now.yml filters on it.
+cmdb_sync_correlation_prefix: 'auto-lab:'
+# Hosts in this inventory group are recorded with category "Database",
+# which now.yml turns back into the database_servers group.
+cmdb_sync_database_group: database_servers
+cmdb_sync_category_database: Database
+cmdb_sync_category_default: Server
+# One of the collection's default choices: development, production, test.
+cmdb_sync_environment: development
+cmdb_sync_short_description: Managed by the auto-lab AAP demonstration

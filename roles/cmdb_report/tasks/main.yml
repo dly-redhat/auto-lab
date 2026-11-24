@@ -1,0 +1,84 @@
+---
+- name: Resolve the report run identifier once
+  ansible.builtin.set_fact:
+    cmdb_report_resolved_run_id: '{{ cmdb_report_run_id }}'
+
+- name: Validate the report inputs and destination
+  ansible.builtin.assert:
+    that:
+      - cmdb_report_hosts is sequence
+      - cmdb_report_hosts is not string
+      - cmdb_report_hosts | length > 0
+      - cmdb_report_host in hostvars
+      - cmdb_report_directory.startswith('/')
+      - cmdb_report_file is match('^[A-Za-z0-9_.-]+\.html$')
+      - cmdb_report_resolved_run_id | string is match('^[A-Za-z0-9_-]+$')
+    fail_msg: >-
+      The CMDB returned no demo hosts, or the report destination is invalid.
+      Check the inventory sync before reading this report.
+
+- name: Collect each host's comparison and note hosts that returned no facts
+  ansible.builtin.set_fact:
+    cmdb_report_records: >-
+      {{ cmdb_report_hosts | map('extract', hostvars)
+         | selectattr('cmdb_report_record', 'defined')
+         | map(attribute='cmdb_report_record') | list }}
+    cmdb_report_unreachable: >-
+      {{ cmdb_report_hosts | reject('in', cmdb_report_scanned) | list }}
+    cmdb_report_generated: "{{ now(utc=true, fmt='%Y-%m-%d %H:%M UTC') }}"
+  vars:
+    cmdb_report_scanned: >-
+      {{ cmdb_report_hosts | map('extract', hostvars)
+         | selectattr('cmdb_report_record', 'defined')
+         | map(attribute='cmdb_report_record.host') | list }}
+
+- name: Create this run's report directory on the report host
+  ansible.builtin.file:
+    path: '{{ cmdb_report_directory }}/{{ cmdb_report_resolved_run_id }}'
+    state: directory
+    mode: '0700'
+  delegate_to: '{{ cmdb_report_host }}'
+
+- name: Render the CMDB accuracy report
+  ansible.builtin.template:
+    src: cmdb_report.html.j2
+    dest: '{{ cmdb_report_directory }}/{{ cmdb_report_resolved_run_id }}/{{ cmdb_report_file }}'
+    mode: '0600'
+  delegate_to: '{{ cmdb_report_host }}'
+
+- name: Summarize each host in the job output
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.host }}:
+      {{ 'matches the CMDB' if item.drift | length == 0
+         else 'CMDB differs on ' ~ (item.drift | join(', ')) }}
+  loop: '{{ cmdb_report_records }}'
+  loop_control:
+    label: '{{ item.host }}'
+
+- name: Flag CMDB hosts that could not be scanned
+  ansible.builtin.debug:
+    msg: '{{ item }}: listed in the CMDB but returned no facts (unreachable or failed)'
+  loop: '{{ cmdb_report_unreachable }}'
+
+- name: Show where the report was saved
+  ansible.builtin.debug:
+    msg:
+      - >-
+        Saved on {{ cmdb_report_host }}:
+        {{ cmdb_report_directory }}/{{ cmdb_report_resolved_run_id }}/{{ cmdb_report_file }}
+      - >-
+        If the report viewer from security_report is running:
+        http://{{ hostvars[cmdb_report_host].ansible_host | default(cmdb_report_host) }}:{{
+        cmdb_report_web_port }}/{{ cmdb_report_resolved_run_id }}/{{ cmdb_report_file }}
+
+- name: Publish the report location and drift count to the job
+  ansible.builtin.set_stats:
+    data:
+      cmdb_report_location: >-
+        {{ cmdb_report_host }}:{{ cmdb_report_directory }}/{{
+        cmdb_report_resolved_run_id }}/{{ cmdb_report_file }}
+      cmdb_report_drifted_hosts: >-
+        {{ cmdb_report_records | selectattr('drift') | map(attribute='host') | list }}
+      cmdb_report_unreachable_hosts: '{{ cmdb_report_unreachable }}'
+    per_host: false

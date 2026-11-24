@@ -1,0 +1,6 @@
+---
+- name: Register the demo guests in the ServiceNow CMDB from their facts
+  hosts: demo_targets
+  gather_facts: true
+  roles:
+    - role: cmdb_sync

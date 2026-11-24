@@ -1,0 +1,29 @@
+---
+# ServiceNow CMDB as the inventory source for the same demo guests.
+# Controller injects SN_HOST, SN_USERNAME and SN_PASSWORD from the
+# "Auto Lab | ServiceNow ITSM" credential; nothing secret lives here.
+# The file name must end in now.yml for the plugin to accept it.
+# Hosts keep their Git inventory names so lab group_vars/host_vars still apply.
+plugin: servicenow.itsm.now
+table: cmdb_ci_linux_server
+# Only records that playbooks/sync_cmdb.yml registered, not PDI demo data.
+sysparm_query: 'correlation_idSTARTSWITHauto-lab:'
+inventory_hostname_source: name
+columns:
+  - name
+  - host_name
+  - fqdn
+  - ip_address
+  - os
+  - os_version
+  - category
+  - environment
+  - correlation_id
+  - sys_id
+  - sys_updated_on
+compose:
+  ansible_host: ip_address
+groups:
+  demo_targets: sys_id is defined
+  rhel: os | default('') is search('Red Hat')
+  database_servers: category | default('') == 'Database'

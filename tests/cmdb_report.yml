@@ -1,0 +1,68 @@
+---
+- name: Verify CMDB drift detection, escaping, and reporting of unscanned hosts
+  hosts: localhost
+  gather_facts: true
+  tasks:
+    - name: Create a disposable report destination
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: auto_lab_cmdb_report_
+      register: cmdb_test_directory
+
+    - name: Exercise the CMDB comparison and report
+      block:
+        # Stand-ins for the host variables the now.yml inventory supplies.
+        - name: Simulate a CMDB record that is wrong on FQDN and OS version
+          ansible.builtin.set_fact:
+            host_name: '{{ ansible_facts.hostname | upper }}'
+            fqdn: '<b>stale</b>.example.com'
+            ip_address: '{{ ansible_facts.default_ipv4.address | default("") }}'
+            os_version: '0.0'
+            category: Database
+            sys_updated_on: '2026-11-01 00:00:00'
+
+        - name: Compare the simulated CMDB record with the gathered facts
+          ansible.builtin.include_role:
+            name: cmdb_report
+            tasks_from: scan
+
+        - name: Check that only the wrong fields are flagged and case is ignored
+          ansible.builtin.assert:
+            that:
+              - cmdb_report_record.drift == ['FQDN', 'OS version']
+
+        - name: Add a CMDB host that returns no facts
+          ansible.builtin.add_host:
+            name: fixture_unscanned
+            ip_address: 192.0.2.10
+
+        - name: Render the report for one scanned and one unscanned host
+          ansible.builtin.include_role:
+            name: cmdb_report
+          vars:
+            cmdb_report_hosts: [localhost, fixture_unscanned]
+            cmdb_report_host: localhost
+            cmdb_report_directory: '{{ cmdb_test_directory.path }}'
+            cmdb_report_run_id: test_run
+
+        - name: Read the rendered report
+          ansible.builtin.slurp:
+            src: '{{ cmdb_test_directory.path }}/test_run/cmdb.html'
+          register: cmdb_test_html
+
+        - name: Check the report content
+          ansible.builtin.assert:
+            that:
+              - cmdb_report_unreachable == ['fixture_unscanned']
+              - "'CMDB differs on 2 fields' in cmdb_test_report"
+              - "'&lt;b&gt;stale&lt;/b&gt;.example.com' in cmdb_test_report"
+              - "'<b>stale</b>' not in cmdb_test_report"
+              - "'fixture_unscanned' in cmdb_test_report"
+              - "'No facts: unreachable or failed' in cmdb_test_report"
+          vars:
+            cmdb_test_report: '{{ cmdb_test_html.content | b64decode }}'
+      always:
+        - name: Remove only the disposable report fixture
+          ansible.builtin.file:
+            path: '{{ cmdb_test_directory.path }}'
+            state: absent

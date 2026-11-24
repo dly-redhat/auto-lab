@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+{# CMDB values are external input: escape every value rendered into HTML. #}
+{% set drifted = cmdb_report_records | selectattr('drift') | list %}
+{% set accurate = cmdb_report_records | rejectattr('drift') | list %}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ cmdb_report_title | e }}</title>
+<style>
+  :root { --ink:#151515; --muted:#6a6e73; --line:#e4e6e9; --bg:#f5f6f8; --card:#fff;
+          --bad:#a30000; --warn:#8f4700; --ok:#2a6224; --accent:#ee0000; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family:"Red Hat Text",-apple-system,"Segoe UI",Helvetica,Arial,sans-serif; font-size:14px; }
+  .wrap { max-width:1100px; margin:0 auto; padding:36px 32px 48px; }
+  .top { border-bottom:3px solid var(--accent); padding-bottom:16px; }
+  h1 { font-family:"Red Hat Display",-apple-system,Helvetica,Arial,sans-serif; font-size:28px; margin:0; }
+  .gen { font-size:13px; color:var(--muted); margin-top:6px; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:24px 0; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 20px; }
+  .kpi .k { font-size:13px; color:var(--muted); font-weight:600; }
+  .kpi .v { font-size:32px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px;
+           padding:18px 22px; margin-bottom:16px; }
+  .head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  h2 { font-size:16px; margin:0; }
+  .sub { font-size:12px; color:var(--muted); margin-top:4px; }
+  .chip { font-size:12px; font-weight:700; padding:4px 11px; border-radius:999px; white-space:nowrap; }
+  .chip.ok { background:#e6f2e3; color:var(--ok); }
+  .chip.bad { background:#fbe7e5; color:var(--bad); }
+  .chip.warn { background:#fdefdc; color:var(--warn); }
+  table { width:100%; border-collapse:collapse; margin-top:12px; }
+  th { text-align:left; font-size:12px; color:var(--muted); padding:7px 10px; border-bottom:1px solid var(--line); }
+  td { padding:9px 10px; border-bottom:1px solid var(--line); }
+  tr:last-child td { border-bottom:0; }
+  td.diff { color:var(--bad); font-weight:700; }
+  .facts { display:flex; flex-wrap:wrap; gap:8px 22px; font-size:12px; color:var(--muted); margin-top:12px; }
+  .facts b { color:var(--ink); font-weight:600; }
+  footer { margin-top:18px; font-size:12px; color:var(--muted); line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>{{ cmdb_report_title | e }}</h1>
+    <div class="gen">Generated {{ cmdb_report_generated }} &middot; run {{ cmdb_report_resolved_run_id | e }}
+      &middot; source: ServiceNow CMDB inventory, checked against live Ansible facts</div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="k">Hosts in CMDB</div><div class="v">{{ cmdb_report_hosts | length }}</div></div>
+    <div class="kpi"><div class="k">CMDB accurate</div><div class="v">{{ accurate | length }}</div></div>
+    <div class="kpi"><div class="k">CMDB out of date</div><div class="v">{{ drifted | length }}</div></div>
+    <div class="kpi"><div class="k">Not scanned</div><div class="v">{{ cmdb_report_unreachable | length }}</div></div>
+  </div>
+
+{% for r in cmdb_report_records | sort(attribute='host') %}
+  <div class="panel">
+    <div class="head">
+      <div>
+        <h2>{{ r.host | e }}</h2>
+        <div class="sub">{{ r.category | e }}{% if r.environment %} &middot; {{ r.environment | e }}{% endif %}
+          &middot; CMDB record updated {{ r.cmdb_updated | e if r.cmdb_updated else 'unknown' }}</div>
+      </div>
+{% if r.drift %}
+      <span class="chip bad">CMDB differs on {{ r.drift | length }} field{{ 's' if r.drift | length != 1 }}</span>
+{% else %}
+      <span class="chip ok">Matches the CMDB</span>
+{% endif %}
+    </div>
+    <table>
+      <tr><th>Field</th><th>In the CMDB</th><th>On the host</th></tr>
+{% for c in r.checks %}
+      <tr><td>{{ c.field }}</td>
+        <td{% if not c.match %} class="diff"{% endif %}>{{ c.cmdb | e if c.cmdb else 'not recorded' }}</td>
+        <td>{{ c.actual | e }}</td></tr>
+{% endfor %}
+    </table>
+    <div class="facts">
+      <span>OS <b>{{ r.facts.os | e }}</b></span>
+      <span>Kernel <b>{{ r.facts.kernel | e }}</b></span>
+      <span>vCPUs <b>{{ r.facts.vcpus }}</b></span>
+      <span>Memory <b>{{ r.facts.memory_mb }} MB</b></span>
+      <span>Uptime <b>{{ r.facts.uptime_days }} days</b></span>
+      <span>SELinux <b>{{ r.facts.selinux | e }}</b></span>
+    </div>
+  </div>
+{% endfor %}
+
+{% for h in cmdb_report_unreachable | sort %}
+  <div class="panel">
+    <div class="head">
+      <div>
+        <h2>{{ h | e }}</h2>
+        <div class="sub">Listed in the CMDB at {{ hostvars[h].ip_address | default('no address') | e }}</div>
+      </div>
+      <span class="chip warn">No facts: unreachable or failed</span>
+    </div>
+  </div>
+{% endfor %}
+
+  <footer>
+    A host "matches" when the CMDB's hostname, FQDN, IP address and OS version equal what the
+    host reports in its Ansible facts. Run the "Sync CMDB from facts" job to correct records.
+    Hosts that could not be scanned are listed as missing evidence, never as accurate.
+  </footer>
+</div>
+</body>
+</html>

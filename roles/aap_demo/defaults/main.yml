@@ -5,3 +5,12 @@ aap_demo_machine_key_file: /run/aap-session/fleet_key
 aap_demo_known_hosts_file: '{{ playbook_dir }}/../artifacts/m5_guest_known_hosts'
 aap_demo_snmp_credential_type: Auto Lab | SNMP policy secrets
 aap_demo_snmp_credential: Auto Lab | SNMP communities
+# ServiceNow CMDB integration stays off until a private aap_demo_servicenow
+# mapping (instance, username, password) is supplied with the overlay.
+aap_demo_servicenow_enabled: false
+aap_demo_servicenow_credential_type: Auto Lab | ServiceNow ITSM
+aap_demo_servicenow_credential: Auto Lab | ServiceNow developer instance
+aap_demo_servicenow_inventory: Auto Lab | ServiceNow CMDB
+aap_demo_servicenow_inventory_source: Auto Lab | CMDB inventory
+aap_demo_servicenow_sync_job: Auto Lab | Sync CMDB from facts - admin only
+aap_demo_servicenow_report_job: Auto Lab | CMDB fact report
