@@ -1,4 +1,9 @@
 ---
-# This milestone uses ansible.builtin only. No Galaxy downloads are required.
-collections: []
+# Managed-host playbooks use ansible.builtin. The ServiceNow CMDB inventory and
+# CMDB sync use the Red Hat certified servicenow.itsm collection; Controller
+# installs it at project sync if the execution environment does not include it.
+collections:
+  - name: servicenow.itsm
+    # A range, not a pin: Automation Hub's certified release can trail upstream.
+    version: '>=2.12.0,<3.0.0'
 roles: []

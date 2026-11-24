@@ -20,10 +20,26 @@
     url: "{{ security_facts_vulnerability_api }}/systems?filter={{ security_facts_display_name | urlencode }}"
     headers:
       Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+    timeout: "{{ security_facts_api_timeout }}"
   register: security_facts_vuln_systems
   delegate_to: localhost
   check_mode: false
   no_log: true
+  # Report the failure in the next task: no_log hides the whole result here.
+  failed_when: false
+  retries: "{{ security_facts_api_retries }}"
+  delay: 10
+  until: security_facts_vuln_systems.status | default(0) == 200
+
+- name: Show why the vulnerability service refused the lookup (no secrets)
+  ansible.builtin.assert:
+    that:
+      - security_facts_vuln_systems.status | default(0) == 200
+    fail_msg: >-
+      Lightspeed vulnerability lookup for {{ security_facts_display_name }} returned
+      HTTP {{ security_facts_vuln_systems.status | default('none') }}:
+      {{ security_facts_vuln_systems.json.errors | default(security_facts_vuln_systems.msg)
+         | default('no detail') }}
 
 - name: Keep only the exact name match (the org is shared with other SAs)
   ansible.builtin.set_fact:
@@ -45,10 +61,14 @@
       {{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?page_size=1&{{ item.query }}
     headers:
       Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+    timeout: "{{ security_facts_api_timeout }}"
   loop: "{{ security_facts_cve_buckets }}"
   loop_control:
     label: "{{ item.name }}"
   register: security_facts_cve_counts
+  retries: "{{ security_facts_api_retries }}"
+  delay: 10
+  until: security_facts_cve_counts is succeeded
   delegate_to: localhost
   check_mode: false
   no_log: true
@@ -76,7 +96,11 @@
       {{ security_facts_vulnerability_api }}/systems/{{ security_facts_vuln_matches[0].id }}/cves?known_exploit=true&page_size=50
     headers:
       Authorization: "Bearer {{ security_facts_token.json.access_token }}"
+    timeout: "{{ security_facts_api_timeout }}"
   register: security_facts_exploit_list
+  retries: "{{ security_facts_api_retries }}"
+  delay: 10
+  until: security_facts_exploit_list is succeeded
   delegate_to: localhost
   check_mode: false
   no_log: true

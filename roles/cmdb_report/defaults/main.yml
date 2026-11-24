@@ -1,0 +1,11 @@
+---
+cmdb_report_title: Server security and CMDB report
+# Hosts the CMDB inventory returned; unreachable ones are reported, not dropped.
+cmdb_report_hosts: "{{ groups['demo_targets'] | default([]) }}"
+# Inventory host that stores the report (same place as the other demo reports).
+cmdb_report_host: rhel_standard
+cmdb_report_directory: /var/tmp/auto-lab-reports
+cmdb_report_file: cmdb.html
+cmdb_report_run_id: "{{ awx_job_id | default(now(utc=true, fmt='%Y%m%dT%H%M%SZ')) }}"
+# Port of the existing report viewer from roles/security_dashboard, if deployed.
+cmdb_report_web_port: 8080

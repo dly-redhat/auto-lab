@@ -1,0 +1,15 @@
+---
+- name: Scan CMDB-listed hosts and compare their facts with the CMDB
+  hosts: demo_targets
+  gather_facts: true
+  tasks:
+    - name: Build this host's comparison record
+      ansible.builtin.include_role:
+        name: cmdb_report
+        tasks_from: scan
+
+- name: Render the CMDB fact report
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: cmdb_report

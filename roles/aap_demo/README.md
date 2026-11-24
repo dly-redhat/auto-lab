@@ -38,3 +38,9 @@ extra-vars overlay. It pins the pushed exception runtime revision; override
 Supply `aap_demo_snmp_communities` privately with `standard` and `special` values.
 The role adds a secret custom credential and attaches it only to the selected
 exception audit/remediation templates. See [the runbook](../../docs/exception-demo.md).
+
+For the ServiceNow CMDB demo, add `controller/servicenow-demo.yml` as a further
+overlay and supply `aap_demo_servicenow` privately with `instance`, `username` and
+`password`. The role then adds a ServiceNow credential type and credential, a
+CMDB-backed inventory, an admin-only CMDB sync template and an operator-executable
+CMDB report template. See [the runbook](../../docs/servicenow-cmdb.md).

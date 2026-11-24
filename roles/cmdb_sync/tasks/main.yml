@@ -1,0 +1,62 @@
+---
+- name: Require gathered facts and a connection address for the CMDB record
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.hostname is defined
+      - ansible_facts.distribution_version is defined
+      - ansible_host is defined
+      - cmdb_sync_environment in ['development', 'production', 'test']
+    fail_msg: Run with gather_facts enabled and an inventory that sets ansible_host.
+
+- name: Collect this host's CVE counts when security_facts ran first
+  ansible.builtin.set_fact:
+    cmdb_sync_security_values: >-
+      {{ dict(cmdb_sync_security_fields | map(attribute='element')
+              | zip(cmdb_sync_security_fields | map(attribute='source')
+                    | map('extract', security_facts_record) | map('string'))) }}
+  when:
+    - security_facts_record is defined
+    - security_facts_record.patch_now is defined
+
+- name: Require CVE counts when this run is meant to record them
+  ansible.builtin.assert:
+    that:
+      - cmdb_sync_security_values is defined
+    fail_msg: >-
+      No CVE counts for {{ inventory_hostname }}. Run security_facts with the
+      Lightspeed credential before cmdb_sync.
+  when: cmdb_sync_require_security | bool
+
+- name: Create or update this host's CMDB record from its gathered facts
+  servicenow.itsm.configuration_item:
+    state: present
+    name: '{{ inventory_hostname }}'
+    sys_class_name: '{{ cmdb_sync_table }}'
+    ip_address: '{{ ansible_host }}'
+    environment: '{{ cmdb_sync_environment }}'
+    category: >-
+      {{ cmdb_sync_category_database
+         if inventory_hostname in groups[cmdb_sync_database_group] | default([])
+         else cmdb_sync_category_default }}
+    short_description: '{{ cmdb_sync_short_description }}'
+    # Values are strings so they compare equal to what ServiceNow returns,
+    # keeping a second run with unchanged data at changed=0.
+    other: '{{ cmdb_sync_base_fields | combine(cmdb_sync_security_values | default({})) }}'
+  delegate_to: localhost
+  vars:
+    cmdb_sync_base_fields:
+      correlation_id: '{{ cmdb_sync_correlation_prefix }}{{ inventory_hostname }}'
+      host_name: '{{ ansible_facts.hostname }}'
+      fqdn: '{{ ansible_facts.fqdn }}'
+      os: Linux Red Hat
+      os_version: '{{ ansible_facts.distribution_version }}'
+      cpu_count: '{{ ansible_facts.processor_vcpus | string }}'
+      ram: '{{ ansible_facts.memtotal_mb | string }}'
+  register: cmdb_sync_record
+
+- name: Show the CMDB record this run wrote
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} -> {{ cmdb_sync_table }} sys_id
+      {{ cmdb_sync_record.record.sys_id | default('unknown') }}
+      ({{ 'updated' if cmdb_sync_record is changed else 'already current' }})
