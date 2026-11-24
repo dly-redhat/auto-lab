@@ -26,3 +26,7 @@ security_facts_cve_buckets:
 
 # Red Hat impact codes to names
 security_facts_impact_names: { 7: Critical, 5: Important, 4: Moderate, 2: Low }
+
+# console.redhat.com can be slow: seconds to wait per call, and retries per call.
+security_facts_api_timeout: 90
+security_facts_api_retries: 3
