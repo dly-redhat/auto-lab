@@ -32,6 +32,16 @@ localhost through `servicenow.itsm.configuration_item`.
 | `cmdb_sync_category_default` | `Server` | Category for other hosts |
 | `cmdb_sync_environment` | `development` | `development`, `production` or `test` |
 | `cmdb_sync_short_description` | demo note | Description shown in ServiceNow |
+| `cmdb_sync_security_fields` | seven CVE fields | Custom CMDB fields and their `security_facts_record` sources |
+| `cmdb_sync_require_security` | `false` | Fail when CVE counts are missing instead of skipping them |
+
+## CVE counts
+
+When `security_facts` ran earlier in the same play, the role also writes the host's
+CVE counts into the custom fields listed in `cmdb_sync_security_fields`.
+`tasks/fields.yml` creates those fields on `cmdb_sync_table` if they are missing; run
+it on localhost with the same ServiceNow credential. `playbooks/security_to_cmdb.yml`
+does both. Values are written as strings so repeat runs compare cleanly.
 
 ## Example
 

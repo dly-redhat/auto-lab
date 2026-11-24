@@ -87,6 +87,45 @@ This creates:
 The existing policy jobs can also be pointed at the CMDB inventory, because the
 host names, groups and variables are the same.
 
+## CVE counts in the CMDB
+
+`playbooks/security_to_cmdb.yml` puts each host's vulnerability picture from Red
+Hat Lightspeed into its CMDB record, so the security team sees patch level in
+ServiceNow next to OS and version.
+
+1. On localhost it creates any missing custom fields on `cmdb_ci_linux_server`
+   (`roles/cmdb_sync/tasks/fields.yml`), so a reset developer instance is rebuilt
+   by the same job.
+2. On each host it runs `security_facts` (needs the Lightspeed credential), then
+   `cmdb_sync` writes the counts. A host with no CVE counts fails instead of
+   being recorded without them.
+
+| CMDB field | Meaning | `security_facts_record` key |
+| --- | --- | --- |
+| `u_cve_critical` | Critical CVEs with a fix available | `fixable_critical` |
+| `u_cve_important` | Important CVEs with a fix available | `fixable_important` |
+| `u_cve_total` | All CVEs with a fix available | `fixable_total` |
+| `u_cve_known_exploit` | CVEs with a known exploit | `known_exploit` |
+| `u_cve_no_fix` | Critical or important CVEs without a fix | `no_fix_critical_important` |
+| `u_last_package_change` | Date of the newest package install or update | `last_package_change_date` |
+| `u_last_security_scan` | When Lightspeed last evaluated the host | `lightspeed_last_evaluation` |
+
+Values change only when Lightspeed's data changes, so a repeat run against
+unchanged hosts reports no changes.
+
+Controller job template (created by hand for now):
+
+- Name: `Auto Lab | Security facts to CMDB`
+- Inventory: `Auto Lab | ServiceNow CMDB`, so the CMDB decides which hosts are scanned
+- Playbook: `playbooks/security_to_cmdb.yml`
+- Credentials: guest SSH, verified guest host keys, the ServiceNow credential
+  (the job writes to ServiceNow), and the Red Hat Lightspeed credential that
+  injects `LIGHTSPEED_CLIENT_ID` and `LIGHTSPEED_CLIENT_SECRET`
+
+The ServiceNow account must be allowed to add dictionary fields (the developer
+instance admin is). To see the values, add the fields to the Linux Server list or
+form in ServiceNow (right-click the list header, *Configure > List Layout*).
+
 ## Report location
 
 The report is saved on `rhel_standard` at

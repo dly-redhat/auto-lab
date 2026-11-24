@@ -1,0 +1,27 @@
+---
+# Creates the custom CVE fields on the CMDB class if they do not exist yet.
+# Runs on localhost; needs a ServiceNow account that can change the dictionary.
+- name: Look up the custom CVE fields on the CMDB class
+  servicenow.itsm.api_info:
+    resource: sys_dictionary
+    sysparm_query: 'name={{ cmdb_sync_table }}^element={{ item.element }}'
+    columns: [element]
+  loop: '{{ cmdb_sync_security_fields }}'
+  loop_control:
+    label: '{{ item.element }}'
+  register: cmdb_sync_field_lookup
+
+- name: Create the custom CVE fields that are missing
+  servicenow.itsm.api:
+    resource: sys_dictionary
+    action: post
+    # Give string fields a 40-character length; integers use ServiceNow's default.
+    data: >-
+      {{ {'name': cmdb_sync_table, 'element': item.item.element,
+          'column_label': item.item.label, 'internal_type': item.item.type,
+          'active': 'true'}
+         | combine({'max_length': '40'} if item.item.type == 'string' else {}) }}
+  loop: '{{ cmdb_sync_field_lookup.results }}'
+  loop_control:
+    label: '{{ item.item.element }}'
+  when: item.record | length == 0

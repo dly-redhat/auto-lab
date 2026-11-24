@@ -11,3 +11,38 @@ cmdb_sync_category_default: Server
 # One of the collection's default choices: development, production, test.
 cmdb_sync_environment: development
 cmdb_sync_short_description: Managed by the auto-lab AAP demonstration
+
+# Custom fields on the CMDB class that hold each host's CVE picture from
+# roles/security_facts. playbooks/security_to_cmdb.yml creates any that are
+# missing. "source" is the key in security_facts_record.
+cmdb_sync_security_fields:
+  - element: u_cve_critical
+    label: CVEs critical with fix
+    type: integer
+    source: fixable_critical
+  - element: u_cve_important
+    label: CVEs important with fix
+    type: integer
+    source: fixable_important
+  - element: u_cve_total
+    label: CVEs with fix available
+    type: integer
+    source: fixable_total
+  - element: u_cve_known_exploit
+    label: CVEs with known exploit
+    type: integer
+    source: known_exploit
+  - element: u_cve_no_fix
+    label: Critical or important CVEs without fix
+    type: integer
+    source: no_fix_critical_important
+  - element: u_last_package_change
+    label: Last package change
+    type: string
+    source: last_package_change_date
+  - element: u_last_security_scan
+    label: Last Lightspeed evaluation
+    type: string
+    source: lightspeed_last_evaluation
+# Fail instead of silently skipping when CVE counts were expected but missing.
+cmdb_sync_require_security: false
