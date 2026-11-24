@@ -24,6 +24,18 @@
   delegate_to: localhost
   check_mode: false
   no_log: true
+  # Report the failure in the next task: no_log hides the whole result here.
+  failed_when: false
+
+- name: Show why the vulnerability service refused the lookup (no secrets)
+  ansible.builtin.assert:
+    that:
+      - security_facts_vuln_systems.status | default(0) == 200
+    fail_msg: >-
+      Lightspeed vulnerability lookup for {{ security_facts_display_name }} returned
+      HTTP {{ security_facts_vuln_systems.status | default('none') }}:
+      {{ security_facts_vuln_systems.json.errors | default(security_facts_vuln_systems.msg)
+         | default('no detail') }}
 
 - name: Keep only the exact name match (the org is shared with other SAs)
   ansible.builtin.set_fact:
