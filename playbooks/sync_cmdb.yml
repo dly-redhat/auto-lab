@@ -1,4 +1,13 @@
 ---
+- name: Make sure the CMDB has fields for the CVE counts
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create any missing custom CVE fields
+      ansible.builtin.include_role:
+        name: cmdb_sync
+        tasks_from: fields
+
 - name: Register the demo guests in the ServiceNow CMDB from their facts
   hosts: demo_targets
   gather_facts: true

@@ -1,5 +1,5 @@
 ---
-cmdb_report_title: CMDB accuracy report
+cmdb_report_title: Server security and CMDB report
 # Hosts the CMDB inventory returned; unreachable ones are reported, not dropped.
 cmdb_report_hosts: "{{ groups['demo_targets'] | default([]) }}"
 # Inventory host that stores the report (same place as the other demo reports).

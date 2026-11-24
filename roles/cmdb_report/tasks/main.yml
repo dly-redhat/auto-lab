@@ -48,10 +48,14 @@
 
 - name: Summarize each host in the job output
   ansible.builtin.debug:
-    msg: >-
-      {{ item.host }}:
-      {{ 'matches the CMDB' if item.drift | length == 0
-         else 'CMDB differs on ' ~ (item.drift | join(', ')) }}
+    msg:
+      - >-
+        {{ item.host }}: {{ 'matches the CMDB' if item.drift | length == 0
+        else 'CMDB differs on ' ~ (item.drift | join(', ')) }}
+      - >-
+        CVEs in CMDB: {{ item.security.critical or '-' }} critical,
+        {{ item.security.important or '-' }} important,
+        {{ item.security.known_exploit or '-' }} known exploit
   loop: '{{ cmdb_report_records }}'
   loop_control:
     label: '{{ item.host }}'

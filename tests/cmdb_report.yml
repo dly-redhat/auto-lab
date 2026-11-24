@@ -20,6 +20,13 @@
             os_version: '0.0'
             category: Database
             sys_updated_on: '2026-11-01 00:00:00'
+            u_cve_critical: '2'
+            u_cve_important: '3'
+            u_cve_total: '11'
+            u_cve_known_exploit: '1'
+            u_cve_no_fix: '0'
+            u_last_package_change: '2026-11-20'
+            u_last_security_scan: '2026-11-24T10:12:33+00:00'
 
         - name: Compare the simulated CMDB record with the gathered facts
           ansible.builtin.include_role:
@@ -59,6 +66,10 @@
               - "'<b>stale</b>' not in cmdb_test_report"
               - "'fixture_unscanned' in cmdb_test_report"
               - "'No facts: unreachable or failed' in cmdb_test_report"
+              - cmdb_report_record.security.known_exploit == '1'
+              - "'Servers as recorded in ServiceNow' in cmdb_test_report"
+              - "'Differs: FQDN, OS version' in cmdb_test_report"
+              - cmdb_test_report is search('Patch now</div>\\s*<div class=\"v red\">5<')
           vars:
             cmdb_test_report: '{{ cmdb_test_html.content | b64decode }}'
       always:

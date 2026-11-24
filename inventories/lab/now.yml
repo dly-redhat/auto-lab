@@ -21,6 +21,15 @@ columns:
   - correlation_id
   - sys_id
   - sys_updated_on
+  # CVE fields written by playbooks/security_to_cmdb.yml. They must exist in
+  # ServiceNow before this inventory syncs: playbooks/sync_cmdb.yml creates them.
+  - u_cve_critical
+  - u_cve_important
+  - u_cve_total
+  - u_cve_known_exploit
+  - u_cve_no_fix
+  - u_last_package_change
+  - u_last_security_scan
 compose:
   ansible_host: ip_address
 groups:

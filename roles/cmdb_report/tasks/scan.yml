@@ -26,6 +26,15 @@
           cmdb: '{{ cmdb_report_cmdb_os_version }}'
           actual: '{{ ansible_facts.distribution_version }}'
           match: '{{ cmdb_report_cmdb_os_version == ansible_facts.distribution_version }}'
+      security:
+        critical: '{{ u_cve_critical | default("") | string }}'
+        important: '{{ u_cve_important | default("") | string }}'
+        total: '{{ u_cve_total | default("") | string }}'
+        known_exploit: '{{ u_cve_known_exploit | default("") | string }}'
+        no_fix: '{{ u_cve_no_fix | default("") | string }}'
+        last_package_change: '{{ u_last_package_change | default("") | string }}'
+        last_scan: '{{ u_last_security_scan | default("") | string }}'
+      os_label: '{{ os | default("") }} {{ os_version | default("") }}'
       facts:
         os: '{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}'
         kernel: '{{ ansible_facts.kernel }}'
