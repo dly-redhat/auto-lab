@@ -3,4 +3,4 @@
 # Supply aap_demo_servicenow (instance, username, password) privately; never in Git.
 aap_demo_servicenow_enabled: true
 # Set to the pushed commit that contains inventories/lab/now.yml and the CMDB roles.
-aap_demo_revision: REPLACE_WITH_PUSHED_COMMIT_SHA
+aap_demo_revision: bc141aebb0b5962660d8116790cc693b30a78a2c
